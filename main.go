@@ -127,6 +127,7 @@ func fatal(err error) {
 func main() {
 	// define origin server URLs
 	originServerURL, err := url.Parse(os.Getenv("UPSTREAM_URL"))
+	fatal(err)
 	originBypassServerURL, err := url.Parse(os.Getenv("UPSTREAM_BYPASS_URL"))
 	AccessToken := os.Getenv("ACCESSTOKEN")
 	fatal(err)
