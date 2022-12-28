@@ -5,14 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/MicahParks/keyfunc"
-	jwt "github.com/golang-jwt/jwt/v4"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	"log"
 	"net/http"
 	"net/url"
@@ -20,6 +13,14 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/MicahParks/keyfunc"
+	jwt "github.com/golang-jwt/jwt/v4"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 )
 
 type TokenExchange struct {
@@ -199,11 +200,8 @@ func main() {
 			req.Header.Set("Authorization", "Bearer "+AccessToken)
 		}
 
-		// set req Host, URL and Request URI to forward a request to the origin server
-
+		//clear request URI
 		req.RequestURI = ""
-		req.URL = req.URL
-
 		originServerResponse, err := http.DefaultClient.Do(req)
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
