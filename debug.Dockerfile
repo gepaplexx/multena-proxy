@@ -8,7 +8,7 @@ COPY . .
 RUN go build -gcflags="all=-N -l"
 
 WORKDIR /go/src/
-RUN go get github.com/go-delve/delve/cmd/dlv
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 FROM alpine:3.17
 COPY --from=go-builder /app/namespace-proxy/namespace-proxy /bin/

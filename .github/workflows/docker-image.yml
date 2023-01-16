@@ -18,7 +18,7 @@ jobs:
           - dockerfile: Dockerfile
             image: ghcr.io/lucostus/namespace-proxy
           - dockerfile: debug.Dockerfile
-            image: ghcr.io/lucostus/namespace-proxy
+            image: ghcr.io/lucostus/namespace-proxy-debug
     steps:
     - uses: actions/checkout@v3
     - name: Set image name
