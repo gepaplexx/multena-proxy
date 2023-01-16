@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -172,6 +173,7 @@ func main() {
 		originBody, err := io.ReadAll(originServerResponse.Body)
 		utils.LogError("Error parsing response body", err)
 		utils.Logger.Info("Upstream Response", zap.String("response", string(originBody)))
+		runtime.GC()
 	})
 
 	utils.LogPanic("error while serving", http.ListenAndServe(":8080", reverseProxy))
