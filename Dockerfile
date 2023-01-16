@@ -1,5 +1,5 @@
 FROM golang:1.19.2-alpine3.16 as go-builder
-WORKDIR /build
+WORKDIR /app/namespace-proxy
 RUN apk add --no-cache gcc g++ make
 COPY go.mod go.sum ./
 RUN go mod verify
@@ -7,7 +7,7 @@ COPY . .
 RUN go build -ldflags="-s -w" .
 
 FROM alpine:3.17
-COPY --from=go-builder /build/token-exchange-namespace-proxy ./bin/
+COPY --from=go-builder /app/namespace-proxy ./bin/
 
-EXPOSE 3000
-ENTRYPOINT [ "/bin/token-exchange-namespace-proxy" ]
+EXPOSE 8080
+ENTRYPOINT [ "/bin/namespace-proxy" ]
