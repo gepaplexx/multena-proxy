@@ -5,62 +5,23 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/MicahParks/keyfunc"
+	"github.com/gepaplexx/namespace-proxy/utils"
+	jwt "github.com/golang-jwt/jwt/v4"
+	"go.uber.org/zap"
 	"io"
-	"log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/MicahParks/keyfunc"
-	jwt "github.com/golang-jwt/jwt/v4"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 )
-
-type TokenExchange struct {
-	AccessToken      string `json:"access_token"`
-	ExpiresIn        int    `json:"expires_in"`
-	RefreshExpiresIn int    `json:"refresh_expires_in"`
-	NotBeforePolicy  int    `json:"not-before-policy"`
-	IssuedTokenType  string `json:"issued_token_type"`
-	AccountLinkURL   string `json:"account-link-url"`
-}
-
-type KeycloakToken struct {
-	SessionState   string   `json:"session_state"`
-	Acr            string   `json:"acr"`
-	AllowedOrigins []string `json:"allowed-origins"`
-	RealmAccess    struct {
-		Roles []string `json:"roles"`
-	} `json:"realm_access"`
-	ResourceAccess struct {
-		RealmManagement struct {
-			Roles []string `json:"roles"`
-		} `json:"realm-management"`
-		Broker struct {
-			Roles []string `json:"roles"`
-		} `json:"broker"`
-		Account struct {
-			Roles []string `json:"roles"`
-		} `json:"account"`
-	} `json:"resource_access"`
-	Scope             string   `json:"scope"`
-	Sid               string   `json:"sid"`
-	EmailVerified     bool     `json:"email_verified"`
-	Name              string   `json:"name"`
-	Groups            []string `json:"groups"`
-	PreferredUsername string   `json:"preferred_username"`
-	GivenName         string   `json:"given_name"`
-	FamilyName        string   `json:"family_name"`
-	Email             string   `json:"email"`
-	jwt.RegisteredClaims
-}
 
 var (
 	jwks      *keyfunc.JWKS
@@ -68,11 +29,13 @@ var (
 )
 
 func init() {
+	utils.InitializeLogger()
+	utils.Logger.Info("Init Proxy")
 	jwksURL := os.Getenv("KEYCLOAK_CERT_URL")
 
 	options := keyfunc.Options{
 		RefreshErrorHandler: func(err error) {
-			log.Printf("There was an error with the jwt.Keyfunc\nError: %s", err.Error())
+			utils.LogError("There was an error with the jwt.Keyfunc", err)
 		},
 		RefreshInterval:   time.Hour,
 		RefreshRateLimit:  time.Minute * 5,
@@ -83,9 +46,7 @@ func init() {
 	// Create the JWKS from the resource at the given URL.
 	err := error(nil)
 	jwks, err = keyfunc.Get(jwksURL, options)
-	if err != nil {
-		log.Fatalf("Failed to create JWKS from resource at the given URL.\nError: %s", err.Error())
-	}
+	utils.LogPanic("Failed to create JWKS from resource at the given URL.", err)
 
 	if os.Getenv("DEV") == "true" {
 		var kubeconfig *string
@@ -97,42 +58,32 @@ func init() {
 		flag.Parse()
 
 		config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-		if err != nil {
-			panic(err)
-		}
+		utils.LogPanic("Kubeconfig error", err)
 		clientset, err = kubernetes.NewForConfig(config)
-		if err != nil {
-			panic(err)
-		}
+		utils.LogPanic("Kubeconfig error", err)
 	} else {
 		// creates the in-cluster config
 		config, err := rest.InClusterConfig()
-		if err != nil {
-			panic(err.Error())
-		}
+		utils.LogPanic("Kubeconfig error", err)
 		// creates the clientset
 		clientset, err = kubernetes.NewForConfig(config)
-		if err != nil {
-			panic(err.Error())
-		}
+		utils.LogPanic("Kubeconfig error", err)
 	}
-}
-
-func fatal(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
+	utils.Logger.Info("Init Complete")
 }
 
 func main() {
+	utils.Logger.Info("Starting Proxy")
 	// define origin server URLs
 	originServerURL, err := url.Parse(os.Getenv("UPSTREAM_URL"))
-	fatal(err)
+	utils.LogPanic("originServerURL must be set", err)
+	utils.Logger.Info("Upstream URL", zap.String("url", originServerURL.String()))
 	originBypassServerURL, err := url.Parse(os.Getenv("UPSTREAM_BYPASS_URL"))
 	AccessToken := os.Getenv("ACCESSTOKEN")
-	fatal(err)
+	utils.LogPanic("OriginBypassServerURL must be set", err)
+	utils.Logger.Info("Upstream URL", zap.String("url", originBypassServerURL.String()))
 	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		fmt.Printf("[reverse proxy server] received request at: %s\n", time.Now())
+		utils.Logger.Info("Recived request", zap.String("request", fmt.Sprintf("%+v", req)))
 
 		//parse jwt from request
 		var keycloakToken KeycloakToken
@@ -141,6 +92,7 @@ func main() {
 		if !token.Valid {
 			rw.WriteHeader(http.StatusForbidden)
 			_, _ = fmt.Fprint(rw, err)
+			utils.Logger.Info("Invalid token", zap.String("token", fmt.Sprintf("%+v", token)))
 			return
 		}
 
@@ -158,18 +110,19 @@ func main() {
 			body := strings.NewReader(params.Encode())
 
 			tokenExchangeRequest, err := http.NewRequest("POST", "https://sso.apps.play.gepaplexx.com/realms/internal/protocol/openid-connect/token", body)
-			fatal(err)
+			utils.LogError("Error with tokenExchangeRequest", err)
 			tokenExchangeRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 			resp, err := http.DefaultClient.Do(tokenExchangeRequest)
-			fatal(err)
+			utils.LogError("Error with doing token exchange request", err)
 			defer resp.Body.Close()
 			b, err := io.ReadAll(resp.Body)
-			fatal(err)
+			utils.LogError("Error parsing token exchange body", err)
+			utils.Logger.Debug("TokenExchange successful")
 
 			var result TokenExchange
 			err = json.Unmarshal(b, &result)
-			fatal(err)
+			utils.LogError("Error unmarshalling TokenExchange struct", err)
 			//request to bypass origin server
 			req.Host = originBypassServerURL.Host
 			req.URL.Host = originBypassServerURL.Host
@@ -192,7 +145,7 @@ func main() {
 			URL := req.URL.String()
 			quIn := strings.Index(URL, "query?") + 6
 			req.URL, err = url.Parse(URL[:quIn] + "namespace=" + strings.Join(namespaces[:], "|") + "&" + URL[quIn:])
-			fatal(err)
+			utils.LogError("Error while creating the namespace url", err)
 
 			//proxy request to origin server
 			req.Host = originServerURL.Host
@@ -205,6 +158,7 @@ func main() {
 		req.RequestURI = ""
 		originServerResponse, err := http.DefaultClient.Do(req)
 		if err != nil {
+
 			rw.WriteHeader(http.StatusInternalServerError)
 			_, _ = fmt.Fprint(rw, err)
 			return
@@ -213,7 +167,12 @@ func main() {
 		// return response to the client
 		rw.WriteHeader(http.StatusOK)
 		io.Copy(rw, originServerResponse.Body)
+
+		defer originServerResponse.Body.Close()
+		originBody, err := io.ReadAll(originServerResponse.Body)
+		utils.LogError("Error parsing response body", err)
+		utils.Logger.Info("Upstream Response", zap.String("response", string(originBody)))
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", reverseProxy))
+	utils.LogPanic("error while serving", http.ListenAndServe(":8080", reverseProxy))
 }
