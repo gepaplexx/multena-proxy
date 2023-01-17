@@ -11,9 +11,9 @@ WORKDIR /go/src/
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 FROM alpine:3.17
-COPY --from=go-builder /app/namespace-proxy/namespace-proxy /bin/
-COPY --from=go-builder /go/bin/dlv /bin/
+COPY --from=go-builder /app/namespace-proxy/namespace-proxy /apps/
+COPY --from=go-builder /go/bin/dlv /apps/
 
 EXPOSE 8080 40000
 
-CMD ["/bin/dlv", "--listen=:40000", "--headless=true", "--api-version=2", "exec", "/bin/namespace-proxy"]
+CMD ["/bin/dlv", "--listen=:40000", "--headless=true", "--api-version=2", "exec", "/apps/namespace-proxy"]
