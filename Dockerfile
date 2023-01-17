@@ -4,7 +4,7 @@ RUN apk add --no-cache gcc g++ make
 COPY go.mod go.sum ./
 RUN go mod verify
 COPY . .
-RUN go build -ldflags="-s -w" .
+RUN go build .
 
 FROM alpine:3.17
 COPY --from=go-builder /app/namespace-proxy ./bin/
