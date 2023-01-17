@@ -8,6 +8,7 @@ import (
 	"github.com/MicahParks/keyfunc"
 	"github.com/gepaplexx/namespace-proxy/utils"
 	jwt "github.com/golang-jwt/jwt/v4"
+	"github.com/google/gops/agent"
 	"go.uber.org/zap"
 	"io"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,6 +75,13 @@ func init() {
 }
 
 func main() {
+	utils.Logger.Info("Starting Agent")
+	err := agent.Listen(agent.Options{
+		ShutdownCleanup: true, // automatically closes on os.Interrupt
+	})
+	utils.LogPanic("Agent error", err)
+
+	utils.Logger.Info("Finished Starting Agent")
 	utils.Logger.Info("Starting Proxy")
 	// define origin server URLs
 	originServerURL, err := url.Parse(os.Getenv("UPSTREAM_URL"))
