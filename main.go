@@ -86,6 +86,12 @@ func main() {
 	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		utils.Logger.Info("Recived request", zap.String("request", fmt.Sprintf("%+v", req)))
 
+		if req.Header.Get("Authorization") == "" {
+			utils.Logger.Info("No Authorization header found")
+			rw.WriteHeader(http.StatusForbidden)
+			return
+		}
+
 		//parse jwt from request
 		var keycloakToken KeycloakToken
 		token, err := jwt.ParseWithClaims(req.Header.Get("Authorization"), &keycloakToken, jwks.Keyfunc)
