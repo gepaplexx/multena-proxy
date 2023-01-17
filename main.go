@@ -96,12 +96,13 @@ func main() {
 		var keycloakToken KeycloakToken
 		token, err := jwt.ParseWithClaims(req.Header.Get("Authorization"), &keycloakToken, jwks.Keyfunc)
 		//if token invalid or expired, return 401
-		if !token.Valid {
-			rw.WriteHeader(http.StatusForbidden)
-			_, _ = fmt.Fprint(rw, err)
-			utils.Logger.Info("Invalid token", zap.String("token", fmt.Sprintf("%+v", token)))
-			return
-		}
+		/*
+			if !token.Valid {
+				rw.WriteHeader(http.StatusForbidden)
+				_, _ = fmt.Fprint(rw, err)
+				utils.Logger.Info("Invalid token", zap.String("token", fmt.Sprintf("%+v", token)))
+				return
+			}*/
 
 		//if user in admin group
 		if keycloakToken.Groups[0] == os.Getenv("ADMIN_GROUP") && strings.ToLower(os.Getenv("TOKEN_EXCHANGE")) == "true" {
