@@ -9,7 +9,7 @@ RUN go build .
 FROM alpine:3.17
 WORKDIR /app/
 RUN mkdir /app/.config
-COPY --from=go-builder /app/namespace-proxy ./app/
+COPY --from=go-builder /app/namespace-proxy .
 
 EXPOSE 8080
 ENTRYPOINT [ "/app/namespace-proxy" ]

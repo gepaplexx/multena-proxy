@@ -14,8 +14,8 @@ FROM alpine:3.17
 RUN mkdir /app/ && mkdir /app/.config
 WORKDIR /app/
 
-COPY --from=go-builder /app/namespace-proxy/namespace-proxy /app/
-COPY --from=go-builder /go/bin/dlv /app/
+COPY --from=go-builder /app/namespace-proxy/namespace-proxy .
+COPY --from=go-builder /go/bin/dlv .
 
 
 EXPOSE 8080 40000
