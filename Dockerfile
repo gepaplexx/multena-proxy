@@ -8,7 +8,7 @@ RUN go build .
 
 FROM alpine:3.17
 WORKDIR /app/
-RUN mkdir /apps/.config
+RUN mkdir /app/.config
 COPY --from=go-builder /app/namespace-proxy ./app/
 
 EXPOSE 8080

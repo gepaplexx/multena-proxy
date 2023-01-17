@@ -11,8 +11,9 @@ WORKDIR /go/src/
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 FROM alpine:3.17
+RUN mkdir /app/ && mkdir /app/.config
 WORKDIR /app/
-RUN mkdir /apps/.config
+
 COPY --from=go-builder /app/namespace-proxy/namespace-proxy /app/
 COPY --from=go-builder /go/bin/dlv /app/
 
