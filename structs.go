@@ -14,6 +14,7 @@ type TokenExchange struct {
 }
 
 type KeycloakToken struct {
+	AuthTime       int      `json:"auth_time,omitempty"`
 	SessionState   string   `json:"session_state"`
 	Acr            string   `json:"acr"`
 	AllowedOrigins []string `json:"allowed-origins"`

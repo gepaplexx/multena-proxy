@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -32,7 +33,11 @@ var (
 
 func init() {
 	utils.InitializeLogger()
+	utils.Logger.Info("Go Version", zap.String("version", runtime.Version()))
 	utils.Logger.Info("Init Proxy")
+	utils.Logger.Info("Set http client to ignore self signed certificates")
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	utils.Logger.Info("Init Keycloak config")
 	jwksURL := os.Getenv("KEYCLOAK_CERT_URL")
 
 	options := keyfunc.Options{
@@ -49,8 +54,11 @@ func init() {
 	err := error(nil)
 	jwks, err = keyfunc.Get(jwksURL, options)
 	utils.LogPanic("Failed to create JWKS from resource at the given URL.", err)
+	utils.Logger.Info("Finished Keycloak config")
 
+	utils.Logger.Info("Init Kubernetes Client")
 	if os.Getenv("DEV") == "true" {
+		utils.Logger.Info("Init Kubernetes Client with local kubeconfig")
 		var kubeconfig *string
 		if home := homedir.HomeDir(); home != "" {
 			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
@@ -64,6 +72,7 @@ func init() {
 		clientset, err = kubernetes.NewForConfig(config)
 		utils.LogPanic("Kubeconfig error", err)
 	} else {
+		utils.Logger.Info("Init Kubernetes Client with in cluster config")
 		// creates the in-cluster config
 		config, err := rest.InClusterConfig()
 		utils.LogPanic("Kubeconfig error", err)
@@ -71,6 +80,7 @@ func init() {
 		clientset, err = kubernetes.NewForConfig(config)
 		utils.LogPanic("Kubeconfig error", err)
 	}
+	utils.Logger.Info("Finished Kubernetes Client")
 	utils.Logger.Info("Init Complete")
 }
 
@@ -95,20 +105,23 @@ func main() {
 		utils.Logger.Info("Recived request", zap.String("request", fmt.Sprintf("%+v", req)))
 
 		if req.Header.Get("Authorization") == "" {
-			utils.Logger.Info("No Authorization header found")
+			utils.Logger.Warn("No Authorization header found")
 			rw.WriteHeader(http.StatusForbidden)
 			return
 		}
 
 		//parse jwt from request
+		tokenString := string(req.Header.Get("Authorization"))[7:]
 		var keycloakToken KeycloakToken
-		token, err := jwt.ParseWithClaims(req.Header.Get("Authorization"), &keycloakToken, jwks.Keyfunc)
+		token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, jwks.Keyfunc)
 		//if token invalid or expired, return 401
+
+		utils.LogPanic("Token Parsing error", err)
 
 		if !token.Valid {
 			//rw.WriteHeader(http.StatusForbidden)
 			//_, _ = fmt.Fprint(rw, err)
-			utils.Logger.Info("Invalid token", zap.String("token", fmt.Sprintf("%+v", token)))
+			utils.Logger.Warn("Invalid token", zap.String("token", fmt.Sprintf("%+v", token)))
 			//return
 		}
 
@@ -146,6 +159,7 @@ func main() {
 			req.Header.Set("Authorization", "Bearer "+result.AccessToken)
 
 		} else {
+			utils.Logger.Info("Searching namespaces")
 			rolebindings, err := clientset.RbacV1().RoleBindings("").List(context.TODO(), metav1.ListOptions{
 				FieldSelector: "metadata.name=gp-dev",
 			})
@@ -157,6 +171,7 @@ func main() {
 					}
 				}
 			}
+			utils.Logger.Info("Finished Searching namespaces")
 			// save the response from the origin server
 			URL := req.URL.String()
 			quIn := strings.Index(URL, "query?") + 6
@@ -171,14 +186,18 @@ func main() {
 		}
 
 		//clear request URI
+		utils.Logger.Info("Client request", zap.String("request", fmt.Sprintf("%+v", req)))
 		req.RequestURI = ""
 		originServerResponse, err := http.DefaultClient.Do(req)
 		if err != nil {
 
 			rw.WriteHeader(http.StatusInternalServerError)
 			_, _ = fmt.Fprint(rw, err)
+			utils.LogError("Client request error", err)
 			return
 		}
+
+		utils.Logger.Info("Finished Client request")
 
 		// return response to the client
 		rw.WriteHeader(http.StatusOK)
@@ -187,7 +206,7 @@ func main() {
 		defer originServerResponse.Body.Close()
 		originBody, err := io.ReadAll(originServerResponse.Body)
 		utils.LogError("Error parsing response body", err)
-		utils.Logger.Info("Upstream Response", zap.String("response", string(originBody)))
+		utils.Logger.Info("Upstream Response", zap.String("response", fmt.Sprintf("%+v", originServerResponse)), zap.String("body", string(originBody)))
 		runtime.GC()
 	})
 
