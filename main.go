@@ -27,8 +27,9 @@ import (
 )
 
 var (
-	jwks      *keyfunc.JWKS
-	clientset *kubernetes.Clientset
+	jwks                *keyfunc.JWKS
+	clientset           *kubernetes.Clientset
+	serviceAccountToken string
 )
 
 func init() {
@@ -57,6 +58,9 @@ func init() {
 	utils.Logger.Info("Finished Keycloak config")
 
 	utils.Logger.Info("Init Kubernetes Client")
+	sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+	utils.LogPanic("Failed to read service account token", err)
+	serviceAccountToken = string(sa)
 	if os.Getenv("DEV") == "true" {
 		utils.Logger.Info("Init Kubernetes Client with local kubeconfig")
 		var kubeconfig *string
@@ -80,6 +84,7 @@ func init() {
 		clientset, err = kubernetes.NewForConfig(config)
 		utils.LogPanic("Kubeconfig error", err)
 	}
+	utils.Logger.Info("Kubeconfig", zap.String("config", fmt.Sprintf("%+v", clientset)))
 	utils.Logger.Info("Finished Kubernetes Client")
 	utils.Logger.Info("Init Complete")
 }
@@ -98,7 +103,6 @@ func main() {
 	utils.LogPanic("originServerURL must be set", err)
 	utils.Logger.Info("Upstream URL", zap.String("url", originServerURL.String()))
 	originBypassServerURL, err := url.Parse(os.Getenv("UPSTREAM_BYPASS_URL"))
-	AccessToken := os.Getenv("ACCESSTOKEN")
 	utils.LogPanic("OriginBypassServerURL must be set", err)
 	utils.Logger.Info("Upstream URL", zap.String("url", originBypassServerURL.String()))
 	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -132,7 +136,7 @@ func main() {
 			params := url.Values{}
 			params.Add("client_id", `grafana`)
 			params.Add("client_secret", os.Getenv("CLIENT_SECRET"))
-			params.Add("subject_token", req.Header.Get("Authorization"))
+			params.Add("subject_token", token.Raw)
 			params.Add("requested_issuer", `openshift`)
 			params.Add("grant_type", `urn:ietf:params:oauth:grant-type:token-exchange`)
 			params.Add("audience", `grafana`)
@@ -182,7 +186,7 @@ func main() {
 			req.Host = originServerURL.Host
 			req.URL.Host = originServerURL.Host
 			req.URL.Scheme = originServerURL.Scheme
-			req.Header.Set("Authorization", "Bearer "+AccessToken)
+			req.Header.Set("Authorization", "Bearer "+serviceAccountToken)
 		}
 
 		//clear request URI
