@@ -120,8 +120,7 @@ func main() {
 		token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, jwks.Keyfunc)
 		//if token invalid or expired, return 401
 
-		utils.LogPanic("Token Parsing error", err)
-
+		utils.LogError("Token Parsing error", err)
 		if !token.Valid {
 			//rw.WriteHeader(http.StatusForbidden)
 			//_, _ = fmt.Fprint(rw, err)
@@ -167,10 +166,11 @@ func main() {
 			rolebindings, err := clientset.RbacV1().RoleBindings("").List(context.TODO(), metav1.ListOptions{
 				FieldSelector: "metadata.name=gp-dev",
 			})
+			utils.LogError("Error while using KubeAPI", err)
 			var namespaces []string
 			for _, rb := range rolebindings.Items {
 				for _, user := range rb.Subjects {
-					if fmt.Sprintf("%s", user.Name) == keycloakToken.PreferredUsername {
+					if strings.ToLower(fmt.Sprintf("%s", user.Name)) == keycloakToken.PreferredUsername {
 						namespaces = append(namespaces, rb.Namespace)
 					}
 				}
@@ -178,7 +178,7 @@ func main() {
 			utils.Logger.Info("Finished Searching namespaces")
 			// save the response from the origin server
 			URL := req.URL.String()
-			quIn := strings.Index(URL, "query?") + 6
+			quIn := strings.Index(URL, "?") + 1
 			req.URL, err = url.Parse(URL[:quIn] + "namespace=" + strings.Join(namespaces[:], "|") + "&" + URL[quIn:])
 			utils.LogError("Error while creating the namespace url", err)
 
@@ -201,17 +201,20 @@ func main() {
 			return
 		}
 
-		utils.Logger.Info("Finished Client request")
+		originBody, err := io.ReadAll(originServerResponse.Body)
+		utils.Logger.Info("Upstream Response", zap.String("response", fmt.Sprintf("%+v", originServerResponse)), zap.String("body", fmt.Sprintf("%s", string(originBody))))
 
 		// return response to the client
 		rw.WriteHeader(http.StatusOK)
-		io.Copy(rw, originServerResponse.Body)
+		_, err = rw.Write(originBody)
+		utils.LogError("Error writing response to client", err)
 
-		defer originServerResponse.Body.Close()
-		originBody, err := io.ReadAll(originServerResponse.Body)
-		utils.LogError("Error parsing response body", err)
-		utils.Logger.Info("Upstream Response", zap.String("response", fmt.Sprintf("%+v", originServerResponse)), zap.String("body", string(originBody)))
-		runtime.GC()
+		utils.Logger.Info("Finished Client request")
+
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			utils.LogError("Error closing body", err)
+		}(originServerResponse.Body)
 	})
 
 	utils.LogPanic("error while serving", http.ListenAndServe(":8080", reverseProxy))
