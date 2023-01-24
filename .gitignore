@@ -1,1 +1,4 @@
 .env
+/jsonnet/vendor
+./jsonnet/vendor
+/jsonnet/vendor/
