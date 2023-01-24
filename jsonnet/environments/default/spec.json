@@ -1,0 +1,15 @@
+{
+  "apiVersion": "tanka.dev/v1alpha1",
+  "kind": "Environment",
+  "metadata": {
+    "name": "environments/prod",
+    "namespace": "environments/prod/main.jsonnet"
+  },
+  "spec": {
+    "apiServer": "https://api.play.gepaplexx.com:6443",
+    "namespace": "grafana-operator-system",
+    "resourceDefaults": {},
+    "expectVersions": {},
+    "injectLabels": true
+  }
+}
