@@ -9,20 +9,20 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
     local rbac = k.rbac.v1.clusterRoleBinding,
 
   config+:: {
-    namespace: 'grrr',
+    namespace: 'grafana-operator-system',
+    tenant_label: 'namespace',
+    upstream: 'https://thanos-querier.openshift-monitoring.svc.cluster.local:9091',
+    log_level: 'info',
     ns_proxy: {
         name: 'ns-proxy',
         port: 8080,
-        keycloak_client_secret: 'secret',
+        keycloak_client_secret: 'TO-BE-SET',
         keycloak_cert_url: 'https://sso.apps.play.gepaplexx.com/realms/internal/protocol/openid-connect/certs',
         admin_group: 'Gepaplexx',
         token_exhange: 'false',
-        bypass_url: 'https://thanos-querier.openshift-monitoring.svc.cluster.local:9091',
     },
     prom_label_proxy:{
         name: 'prom-label-proxy',
-        upstream_url: 'https://thanos-querier.openshift-monitoring.svc.cluster.local:9091',
-        label: 'namespace',
         port: 9095,
     }
   },
@@ -32,19 +32,19 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
         name=$.config.ns_proxy.name,
         replicas=1,
         containers=[
-          container.new($.config.ns_proxy.name, 'ghcr.io/lucostus/namespace-proxy:uff-v0.0.1')
+          container.new($.config.ns_proxy.name, 'ghcr.io/lucostus/namespace-proxy:sha-2d87a7b')
           + container.withPorts([port.new('http', $.config.ns_proxy.port)])
           + container.withEnvMap({
             'UPSTREAM_URL': "http://"+$.prom_label_proxy.service.metadata.name+"."+$.config.namespace+".svc.cluster.local:"+$.config.prom_label_proxy.port,
             'CLIENT_SECRET': $.config.ns_proxy.keycloak_client_secret,
             'DEV': "false",
-            'LOG_LEVEL': "debug",
-            'UPSTREAM_BYPASS_URL': $.config.ns_proxy.bypass_url,
+            'LOG_LEVEL': $.config.log_level,
+            'TENANT_LABEL': $.config.tenant_label,
+            'UPSTREAM_BYPASS_URL': $.config.upstream,
             'TOKEN_EXCHANGE': $.config.ns_proxy.token_exhange,
             'KEYCLOAK_CERT_URL': $.config.ns_proxy.keycloak_cert_url,
             'ADMIN_GROUP': $.config.ns_proxy.admin_group,
           })
-//          + securityContext.capabilities.withAdd("SYS_PTRACE")
         ],
       ),
       service:
@@ -79,12 +79,13 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
         + container.withPorts([port.new('http', 9095)])
         + container.withArgsMixin([
         '--insecure-listen-address=0.0.0.0:9095',
-        '--upstream='+ $.config.prom_label_proxy.upstream_url,
-        '--label='+ $.config.prom_label_proxy.label,
+        '--upstream='+ $.config.upstream,
+        '--label=' + $.config.tenant_label,
+        '--query-param=' + $.config.tenant_label,
         '--enable-label-apis',
         '--error-on-replace'
         ])])
-        + deployment.configVolumeMount('openshift-service-ca', '/etc/ssl/certs/'),
+        + deployment.configVolumeMount('openshift-service-ca', '/etc/ssl/certs/', {}, {configMap: {name: "openshift-service-ca.crt"}}),
         service:
                 k.util.serviceFor($.prom_label_proxy.deployment)
                 + service.mixin.spec.withType('ClusterIP'),

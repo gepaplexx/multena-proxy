@@ -5,7 +5,7 @@ metadata:
     name: ns-proxy
     tanka.dev/environment: ef8004c80176691d8a0f3688c077aa401e0b6083174fa72e
   name: ns-proxy
-  namespace: grrr
+  namespace: grafana-operator-system
 spec:
   ports:
   - name: ns-proxy-http

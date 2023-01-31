@@ -4,7 +4,7 @@ metadata:
   labels:
     tanka.dev/environment: ef8004c80176691d8a0f3688c077aa401e0b6083174fa72e
   name: prom-label-proxy
-  namespace: grrr
+  namespace: grafana-operator-system
 spec:
   minReadySeconds: 10
   replicas: 1
@@ -22,6 +22,7 @@ spec:
         - --insecure-listen-address=0.0.0.0:9095
         - --upstream=https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
         - --label=namespace
+        - --query-param=namespace
         - --enable-label-apis
         - --error-on-replace
         image: ghcr.io/lucostus/prom-label-proxy:multi-value-regex-v0.0.4

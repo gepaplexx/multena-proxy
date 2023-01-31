@@ -5,7 +5,7 @@ metadata:
     name: prom-label-proxy
     tanka.dev/environment: ef8004c80176691d8a0f3688c077aa401e0b6083174fa72e
   name: prom-label-proxy
-  namespace: grrr
+  namespace: grafana-operator-system
 spec:
   ports:
   - name: prom-label-proxy-http
