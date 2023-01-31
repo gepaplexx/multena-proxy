@@ -25,7 +25,7 @@ jobs:
       run: echo "IMAGE_ID=$(echo ${{ github.repository }} | tr '[A-Z]' '[a-z]')" >> $GITHUB_ENV
 
     - name: Autotag
-      uses: phish108/autotag-action@1.1.52
+      uses: phish108/autotag-action@1.1.53
       id: autotag
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
