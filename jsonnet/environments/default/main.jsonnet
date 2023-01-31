@@ -38,6 +38,7 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
             'UPSTREAM_URL': "http://"+$.prom_label_proxy.service.metadata.name+"."+$.config.namespace+".svc.cluster.local:"+$.config.prom_label_proxy.port,
             'CLIENT_SECRET': $.config.ns_proxy.keycloak_client_secret,
             'DEV': "false",
+            'LOG_LEVEL': "debug",
             'UPSTREAM_BYPASS_URL': $.config.ns_proxy.bypass_url,
             'TOKEN_EXCHANGE': $.config.ns_proxy.token_exhange,
             'KEYCLOAK_CERT_URL': $.config.ns_proxy.keycloak_cert_url,

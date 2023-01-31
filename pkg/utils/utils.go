@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/MicahParks/keyfunc"
@@ -23,8 +25,26 @@ var (
 )
 
 func InitializeLogger() {
-	Logger, _ = zap.NewProduction()
+	rawJSON := []byte(`{
+		"level": "` + strings.ToLower(os.Getenv("LOG_LEVEL")) + `",
+		"encoding": "json",
+		"outputPaths": ["stdout"],
+		"errorOutputPaths": ["stderr"],
+		"encoderConfig": {
+		  "messageKey": "message",
+		  "levelKey": "level",
+		  "levelEncoder": "lowercase"
+		}
+	  }`)
+
+	var cfg zap.Config
+	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
+		panic(err)
+	}
+	Logger := zap.Must(cfg.Build())
 	defer Logger.Sync()
+
+	Logger.Info("logger construction succeeded")
 }
 
 func LogPanic(msg string, err error) {
