@@ -1,18 +1,16 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/MicahParks/keyfunc"
-	"github.com/gepaplexx/namespace-proxy/utils"
+	"github.com/gepaplexx/namespace-proxy/pkg/utils"
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/google/gops/agent"
 	"go.uber.org/zap"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -30,6 +28,7 @@ var (
 	jwks                *keyfunc.JWKS
 	clientset           *kubernetes.Clientset
 	serviceAccountToken string
+	tenantLabel         = os.Getenv("TENANT_LABEL")
 )
 
 func init() {
@@ -104,13 +103,14 @@ func main() {
 	utils.Logger.Info("Upstream URL", zap.String("url", originServerURL.String()))
 	originBypassServerURL, err := url.Parse(os.Getenv("UPSTREAM_BYPASS_URL"))
 	utils.LogPanic("OriginBypassServerURL must be set", err)
-	utils.Logger.Info("Upstream URL", zap.String("url", originBypassServerURL.String()))
+	utils.Logger.Info("Bypass Upstream URL", zap.String("url", originBypassServerURL.String()))
 	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		utils.Logger.Info("Recived request", zap.String("request", fmt.Sprintf("%+v", req)))
 
 		if req.Header.Get("Authorization") == "" {
 			utils.Logger.Warn("No Authorization header found")
 			rw.WriteHeader(http.StatusForbidden)
+			_, _ = fmt.Fprint(rw, "No Authorization header found")
 			return
 		}
 
@@ -122,10 +122,10 @@ func main() {
 
 		utils.LogError("Token Parsing error", err)
 		if !token.Valid {
-			//rw.WriteHeader(http.StatusForbidden)
-			//_, _ = fmt.Fprint(rw, err)
+			rw.WriteHeader(http.StatusForbidden)
+			_, _ = fmt.Fprint(rw, "error while parsing token")
 			utils.Logger.Warn("Invalid token", zap.String("token", fmt.Sprintf("%+v", token)))
-			//return
+			return
 		}
 
 		//if user in admin group
@@ -162,24 +162,15 @@ func main() {
 			req.Header.Set("Authorization", "Bearer "+result.AccessToken)
 
 		} else {
-			utils.Logger.Info("Searching namespaces")
-			rolebindings, err := clientset.RbacV1().RoleBindings("").List(context.TODO(), metav1.ListOptions{
-				FieldSelector: "metadata.name=gp-dev",
-			})
-			utils.LogError("Error while using KubeAPI", err)
-			var namespaces []string
-			for _, rb := range rolebindings.Items {
-				for _, user := range rb.Subjects {
-					if strings.ToLower(fmt.Sprintf("%s", user.Name)) == keycloakToken.PreferredUsername {
-						namespaces = append(namespaces, rb.Namespace)
-					}
-				}
-			}
-			utils.Logger.Info("Finished Searching namespaces")
+			labels := GetLabelsFromRoleBindings(keycloakToken.PreferredUsername)
 			// save the response from the origin server
 			URL := req.URL.String()
 			quIn := strings.Index(URL, "?") + 1
-			req.URL, err = url.Parse(URL[:quIn] + "namespace=" + strings.Join(namespaces[:], "|") + "&" + URL[quIn:])
+			labelsEnforcer := ""
+			for _, label := range labels {
+				labelsEnforcer += fmt.Sprintf("%s=\"%s\"&", tenantLabel, label)
+			}
+			req.URL, err = url.Parse(URL[:quIn] + labelsEnforcer + URL[quIn:])
 			utils.LogError("Error while creating the namespace url", err)
 
 			//proxy request to origin server

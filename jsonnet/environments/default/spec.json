@@ -3,11 +3,11 @@
   "kind": "Environment",
   "metadata": {
     "name": "environments/prod",
-    "namespace": "environments/prod/main.jsonnet"
+    "namespace": "grrr"
   },
   "spec": {
     "apiServer": "https://api.play.gepaplexx.com:6443",
-    "namespace": "grafana-operator-system",
+    "namespace": "grrr",
     "resourceDefaults": {},
     "expectVersions": {},
     "injectLabels": true

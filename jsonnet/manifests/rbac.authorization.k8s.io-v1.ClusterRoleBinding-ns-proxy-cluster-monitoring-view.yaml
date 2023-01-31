@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    tanka.dev/environment: ef8004c80176691d8a0f3688c077aa401e0b6083174fa72e
+  name: ns-proxy-cluster-monitoring-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-monitoring-view
+subjects:
+- kind: ServiceAccount
+  name: ns-proxy
+  namespace: grrr

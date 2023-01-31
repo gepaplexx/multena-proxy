@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: prom-label-proxy
+    tanka.dev/environment: ef8004c80176691d8a0f3688c077aa401e0b6083174fa72e
+  name: prom-label-proxy
+  namespace: grrr
+spec:
+  ports:
+  - name: prom-label-proxy-http
+    port: 9095
+    targetPort: 9095
+  selector:
+    name: prom-label-proxy
+  type: ClusterIP
