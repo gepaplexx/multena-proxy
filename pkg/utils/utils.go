@@ -42,7 +42,6 @@ func InitializeLogger() {
 		panic(err)
 	}
 	Logger := zap.Must(cfg.Build())
-	defer Logger.Sync()
 
 	Logger.Info("logger construction succeeded")
 }

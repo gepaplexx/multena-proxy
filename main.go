@@ -31,6 +31,7 @@ func init() {
 }
 
 func main() {
+	defer utils.Logger.Sync()
 	utils.Logger.Info("Starting Agent")
 	err := agent.Listen(agent.Options{
 		ShutdownCleanup: true, // automatically closes on os.Interrupt
