@@ -137,6 +137,7 @@ func main() {
 		}
 
 		originBody, err := io.ReadAll(originServerResponse.Body)
+		utils.LogError("Error reading origin server response body", err)
 		utils.Logger.Debug("Upstream Response", zap.String("response", fmt.Sprintf("%+v", originServerResponse)), zap.String("body", fmt.Sprintf("%s", string(originBody))))
 
 		// return response to the client
