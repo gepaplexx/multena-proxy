@@ -16,9 +16,9 @@ jobs:
       matrix:
         include:
           - dockerfile: Dockerfile
-            image: ghcr.io/lucostus/namespace-proxy
+            image: ghcr.io/gepaplexx/multena-proxy
           - dockerfile: debug.Dockerfile
-            image: ghcr.io/lucostus/namespace-proxy-debug
+            image: ghcr.io/gepaplexx/multena-proxy-debug
     steps:
     - uses: actions/checkout@v3
     - name: Set image name
