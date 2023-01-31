@@ -113,7 +113,7 @@ func main() {
 			quIn := strings.Index(URL, "?") + 1
 			labelsEnforcer := ""
 			for _, label := range labels {
-				labelsEnforcer += fmt.Sprintf("%s=\"%s\"&", tenantLabel, label)
+				labelsEnforcer += fmt.Sprintf("%s=%s&", tenantLabel, label)
 			}
 			req.URL, err = url.Parse(URL[:quIn] + labelsEnforcer + URL[quIn:])
 			utils.LogError("Error while creating the namespace url", err)
