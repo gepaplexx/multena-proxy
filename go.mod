@@ -1,4 +1,4 @@
-module github.com/gepaplexx/namespace-proxy
+module github.com/gepaplexx/multena-proxy
 
 go 1.19
 

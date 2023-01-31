@@ -1,5 +1,5 @@
 FROM golang:1.19.2-alpine3.16 as go-builder
-WORKDIR /app/namespace-proxy
+WORKDIR /app/multena-proxy
 RUN apk add --no-cache gcc g++ make
 COPY go.mod go.sum ./
 RUN go mod verify
@@ -13,8 +13,8 @@ ENV GOPS_CONFIG_DIR /app/.config
 RUN mkdir /app/.config
 
 
-COPY --from=go-builder /app/namespace-proxy/namespace-proxy .
+COPY --from=go-builder /app/multena-proxy/multena-proxy .
 
 RUN chgrp -R 0 /app && chmod -R g=u /app
 EXPOSE 8080
-ENTRYPOINT [ "/app/namespace-proxy" ]
+ENTRYPOINT [ "/app/multena-proxy" ]

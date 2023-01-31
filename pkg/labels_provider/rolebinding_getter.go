@@ -3,15 +3,15 @@ package labels_provider
 import (
 	"context"
 	"fmt"
-	"github.com/gepaplexx/namespace-proxy/pkg/utils"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
 	"strings"
+
+	"github.com/gepaplexx/multena-proxy/pkg/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func GetLabelsFromRoleBindings(username string) []string {
 	utils.Logger.Debug("Searching namespaces")
-	rolebindings, err := clientset.RbacV1().RoleBindings("").List(context.TODO(), metav1.ListOptions{
+	rolebindings, err := utils.ClientSet.RbacV1().RoleBindings("").List(context.TODO(), metav1.ListOptions{
 		FieldSelector: "metadata.name=gp-dev",
 	})
 	utils.LogError("Error while using KubeAPI", err)

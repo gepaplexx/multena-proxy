@@ -3,32 +3,20 @@ package main
 import (
 	"crypto/tls"
 	"encoding/json"
-	"flag"
 	"fmt"
-	"github.com/MicahParks/keyfunc"
-	"github.com/gepaplexx/namespace-proxy/pkg/utils"
-	jwt "github.com/golang-jwt/jwt/v4"
-	"github.com/google/gops/agent"
-	"go.uber.org/zap"
 	"io"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
-)
 
-var (
-	jwks                *keyfunc.JWKS
-	clientset           *kubernetes.Clientset
-	serviceAccountToken string
-	tenantLabel         = os.Getenv("TENANT_LABEL")
+	"github.com/gepaplexx/multena-proxy/pkg/labels_provider"
+	"github.com/gepaplexx/multena-proxy/pkg/model"
+	"github.com/gepaplexx/multena-proxy/pkg/utils"
+	jwt "github.com/golang-jwt/jwt/v4"
+	"github.com/google/gops/agent"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -37,54 +25,8 @@ func init() {
 	utils.Logger.Info("Init Proxy")
 	utils.Logger.Info("Set http client to ignore self signed certificates")
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	utils.Logger.Info("Init Keycloak config")
-	jwksURL := os.Getenv("KEYCLOAK_CERT_URL")
-
-	options := keyfunc.Options{
-		RefreshErrorHandler: func(err error) {
-			utils.LogError("There was an error with the jwt.Keyfunc", err)
-		},
-		RefreshInterval:   time.Hour,
-		RefreshRateLimit:  time.Minute * 5,
-		RefreshTimeout:    time.Second * 10,
-		RefreshUnknownKID: true,
-	}
-
-	// Create the JWKS from the resource at the given URL.
-	err := error(nil)
-	jwks, err = keyfunc.Get(jwksURL, options)
-	utils.LogPanic("Failed to create JWKS from resource at the given URL.", err)
-	utils.Logger.Info("Finished Keycloak config")
-
-	utils.Logger.Info("Init Kubernetes Client")
-	sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
-	utils.LogPanic("Failed to read service account token", err)
-	serviceAccountToken = string(sa)
-	if os.Getenv("DEV") == "true" {
-		utils.Logger.Info("Init Kubernetes Client with local kubeconfig")
-		var kubeconfig *string
-		if home := homedir.HomeDir(); home != "" {
-			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-		} else {
-			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-		}
-		flag.Parse()
-
-		config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-		utils.LogPanic("Kubeconfig error", err)
-		clientset, err = kubernetes.NewForConfig(config)
-		utils.LogPanic("Kubeconfig error", err)
-	} else {
-		utils.Logger.Info("Init Kubernetes Client with in cluster config")
-		// creates the in-cluster config
-		config, err := rest.InClusterConfig()
-		utils.LogPanic("Kubeconfig error", err)
-		// creates the clientset
-		clientset, err = kubernetes.NewForConfig(config)
-		utils.LogPanic("Kubeconfig error", err)
-	}
-	utils.Logger.Info("Kubeconfig", zap.String("config", fmt.Sprintf("%+v", clientset)))
-	utils.Logger.Info("Finished Kubernetes Client")
+	utils.InitJWKS()
+	utils.InitKubeClient()
 	utils.Logger.Info("Init Complete")
 }
 
@@ -100,10 +42,12 @@ func main() {
 	// define origin server URLs
 	originServerURL, err := url.Parse(os.Getenv("UPSTREAM_URL"))
 	utils.LogPanic("originServerURL must be set", err)
-	utils.Logger.Info("Upstream URL", zap.String("url", originServerURL.String()))
+	utils.Logger.Debug("Upstream URL", zap.String("url", originServerURL.String()))
 	originBypassServerURL, err := url.Parse(os.Getenv("UPSTREAM_BYPASS_URL"))
 	utils.LogPanic("OriginBypassServerURL must be set", err)
-	utils.Logger.Info("Bypass Upstream URL", zap.String("url", originBypassServerURL.String()))
+	utils.Logger.Debug("Bypass Upstream URL", zap.String("url", originBypassServerURL.String()))
+	utils.Logger.Debug("Tenant Label", zap.String("label", os.Getenv("TENANT_LABEL")))
+	tenantLabel := os.Getenv("TENANT_LABEL")
 	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		utils.Logger.Info("Recived request", zap.String("request", fmt.Sprintf("%+v", req)))
 
@@ -116,8 +60,8 @@ func main() {
 
 		//parse jwt from request
 		tokenString := string(req.Header.Get("Authorization"))[7:]
-		var keycloakToken KeycloakToken
-		token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, jwks.Keyfunc)
+		var keycloakToken model.KeycloakToken
+		token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, utils.Jwks.Keyfunc)
 		//if token invalid or expired, return 401
 
 		utils.LogError("Token Parsing error", err)
@@ -152,7 +96,7 @@ func main() {
 			utils.LogError("Error parsing token exchange body", err)
 			utils.Logger.Debug("TokenExchange successful")
 
-			var result TokenExchange
+			var result model.TokenExchange
 			err = json.Unmarshal(b, &result)
 			utils.LogError("Error unmarshalling TokenExchange struct", err)
 			//request to bypass origin server
@@ -162,7 +106,7 @@ func main() {
 			req.Header.Set("Authorization", "Bearer "+result.AccessToken)
 
 		} else {
-			labels := GetLabelsFromRoleBindings(keycloakToken.PreferredUsername)
+			labels := labels_provider.GetLabelsFromRoleBindings(keycloakToken.PreferredUsername)
 			// save the response from the origin server
 			URL := req.URL.String()
 			quIn := strings.Index(URL, "?") + 1
@@ -177,11 +121,11 @@ func main() {
 			req.Host = originServerURL.Host
 			req.URL.Host = originServerURL.Host
 			req.URL.Scheme = originServerURL.Scheme
-			req.Header.Set("Authorization", "Bearer "+serviceAccountToken)
+			req.Header.Set("Authorization", "Bearer "+utils.ServiceAccountToken)
 		}
 
 		//clear request URI
-		utils.Logger.Info("Client request", zap.String("request", fmt.Sprintf("%+v", req)))
+		utils.Logger.Debug("Client request", zap.String("request", fmt.Sprintf("%+v", req)))
 		req.RequestURI = ""
 		originServerResponse, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -193,14 +137,14 @@ func main() {
 		}
 
 		originBody, err := io.ReadAll(originServerResponse.Body)
-		utils.Logger.Info("Upstream Response", zap.String("response", fmt.Sprintf("%+v", originServerResponse)), zap.String("body", fmt.Sprintf("%s", string(originBody))))
+		utils.Logger.Debug("Upstream Response", zap.String("response", fmt.Sprintf("%+v", originServerResponse)), zap.String("body", fmt.Sprintf("%s", string(originBody))))
 
 		// return response to the client
 		rw.WriteHeader(http.StatusOK)
 		_, err = rw.Write(originBody)
 		utils.LogError("Error writing response to client", err)
 
-		utils.Logger.Info("Finished Client request")
+		utils.Logger.Debug("Finished Client request")
 
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
