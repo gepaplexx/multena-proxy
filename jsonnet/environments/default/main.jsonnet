@@ -20,6 +20,7 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
         keycloak_cert_url: 'https://sso.apps.play.gepaplexx.com/realms/internal/protocol/openid-connect/certs',
         admin_group: 'Gepaplexx',
         token_exhange: 'false',
+        provider: 'openshift',
     },
     prom_label_proxy:{
         name: 'prom-label-proxy',
@@ -38,6 +39,7 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
             'UPSTREAM_URL': "http://"+$.prom_label_proxy.service.metadata.name+"."+$.config.namespace+".svc.cluster.local:"+$.config.prom_label_proxy.port,
             'CLIENT_SECRET': $.config.ns_proxy.keycloak_client_secret,
             'DEV': "false",
+            'PROVIDER': $.config.ns_proxy.provider,
             'LOG_LEVEL': $.config.log_level,
             'TENANT_LABEL': $.config.tenant_label,
             'UPSTREAM_BYPASS_URL': $.config.upstream,

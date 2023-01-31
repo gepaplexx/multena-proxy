@@ -14,7 +14,7 @@ import (
 	"github.com/gepaplexx/multena-proxy/pkg/labels_provider"
 	"github.com/gepaplexx/multena-proxy/pkg/model"
 	"github.com/gepaplexx/multena-proxy/pkg/utils"
-	jwt "github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/gops/agent"
 	"go.uber.org/zap"
 )
@@ -107,7 +107,16 @@ func main() {
 			req.Header.Set("Authorization", "Bearer "+result.AccessToken)
 
 		} else {
-			labels := labels_provider.GetLabelsFromRoleBindings(keycloakToken.PreferredUsername)
+			var labels []string
+			switch provider := os.Getenv("PROVIDER"); provider {
+			case "openshift":
+				labels = labels_provider.GetLabelsFromRoleBindings(keycloakToken.PreferredUsername)
+			case "mysql":
+				labels = labels_provider.GetLabelsFromDB(keycloakToken.PreferredUsername)
+			default:
+				utils.Logger.Panic("No provider set")
+			}
+
 			// save the response from the origin server
 			URL := req.URL.String()
 			quIn := strings.Index(URL, "?") + 1
