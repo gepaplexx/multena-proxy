@@ -41,7 +41,7 @@ func InitializeLogger() {
 	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
 		panic(err)
 	}
-	Logger := zap.Must(cfg.Build())
+	Logger = zap.Must(cfg.Build())
 
 	Logger.Info("logger construction succeeded")
 }
