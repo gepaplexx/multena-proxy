@@ -49,6 +49,7 @@ func main() {
 	utils.Logger.Debug("Bypass Upstream URL", zap.String("url", originBypassServerURL.String()))
 	utils.Logger.Debug("Tenant Label", zap.String("label", os.Getenv("TENANT_LABEL")))
 	tenantLabel := os.Getenv("TENANT_LABEL")
+	tokenExchangeURL := os.Getenv("TOKEN_EXCHANGE_URL")
 	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		utils.Logger.Info("Recived request", zap.String("request", fmt.Sprintf("%+v", req)))
 
@@ -86,7 +87,7 @@ func main() {
 			params.Add("audience", `grafana`)
 			body := strings.NewReader(params.Encode())
 
-			tokenExchangeRequest, err := http.NewRequest("POST", "https://sso.apps.play.gepaplexx.com/realms/internal/protocol/openid-connect/token", body)
+			tokenExchangeRequest, err := http.NewRequest("POST", tokenExchangeURL, body)
 			utils.LogError("Error with tokenExchangeRequest", err)
 			tokenExchangeRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 

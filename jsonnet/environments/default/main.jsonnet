@@ -18,6 +18,7 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
         port: 8080,
         keycloak_client_secret: 'TO-BE-SET',
         keycloak_cert_url: 'https://sso.apps.play.gepaplexx.com/realms/internal/protocol/openid-connect/certs',
+        token_exchange_url: 'https://sso.apps.play.gepaplexx.com/realms/internal/protocol/openid-connect/token',
         admin_group: 'Gepaplexx',
         token_exhange: 'false',
         provider: 'openshift',
@@ -44,6 +45,7 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
             'TENANT_LABEL': $.config.tenant_label,
             'UPSTREAM_BYPASS_URL': $.config.upstream,
             'TOKEN_EXCHANGE': $.config.ns_proxy.token_exhange,
+            'TOKEN_EXCHANGE_URL': $.config.ns_proxy.token_exchange_url,
             'KEYCLOAK_CERT_URL': $.config.ns_proxy.keycloak_cert_url,
             'ADMIN_GROUP': $.config.ns_proxy.admin_group,
           })
