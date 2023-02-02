@@ -20,7 +20,6 @@ import (
 )
 
 func init() {
-	utils.InitializeLogger()
 	utils.Logger.Info("Go Version", zap.String("version", runtime.Version()))
 	utils.Logger.Info("Init Proxy")
 	utils.Logger.Info("Set http client to ignore self signed certificates")
@@ -36,20 +35,41 @@ func main() {
 	err := agent.Listen(agent.Options{
 		ShutdownCleanup: true, // automatically closes on os.Interrupt
 	})
-	utils.LogPanic("Agent error", err)
+
+	if nil != err {
+		utils.LogPanic("Error while configuring agent", err)
+	}
 
 	utils.Logger.Info("Finished Starting Agent")
 	utils.Logger.Info("Starting Proxy")
 	// define origin server URLs
 	originServerURL, err := url.Parse(os.Getenv("UPSTREAM_URL"))
-	utils.LogPanic("originServerURL must be set", err)
+	if err != nil {
+		utils.LogPanic("originServerURL must be set", err)
+	}
+
 	utils.Logger.Debug("Upstream URL", zap.String("url", originServerURL.String()))
 	originBypassServerURL, err := url.Parse(os.Getenv("UPSTREAM_BYPASS_URL"))
-	utils.LogPanic("OriginBypassServerURL must be set", err)
+	if err != nil {
+		utils.LogPanic("OriginBypassServerURL must be set", err)
+	}
+
 	utils.Logger.Debug("Bypass Upstream URL", zap.String("url", originBypassServerURL.String()))
 	utils.Logger.Debug("Tenant Label", zap.String("label", os.Getenv("TENANT_LABEL")))
 	tenantLabel := os.Getenv("TENANT_LABEL")
-	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+
+	reverseProxy := configureProxy(originBypassServerURL, tenantLabel, originServerURL)
+
+	err = http.ListenAndServe(":8080", reverseProxy)
+	if err != nil {
+		utils.LogError("Error starting server", err)
+		panic(err)
+	}
+
+}
+
+func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originServerURL *url.URL) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
 		utils.Logger.Info("Recived request", zap.String("request", fmt.Sprintf("%+v", req)))
 
 		if req.Header.Get("Authorization") == "" {
@@ -152,7 +172,5 @@ func main() {
 			err := Body.Close()
 			utils.LogError("Error closing body", err)
 		}(originServerResponse.Body)
-	})
-
-	utils.LogPanic("error while serving", http.ListenAndServe(":8080", reverseProxy))
+	}
 }

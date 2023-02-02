@@ -15,9 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dockerfile: Dockerfile
+          - dockerfile: Containerfile
             image: ghcr.io/gepaplexx/multena-proxy
-          - dockerfile: debug.Dockerfile
+          - dockerfile: Containerfile.Debug
             image: ghcr.io/gepaplexx/multena-proxy-debug
     steps:
     - uses: actions/checkout@v3
