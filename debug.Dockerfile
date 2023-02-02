@@ -1,4 +1,4 @@
-FROM golang:1.19.5-alpine3.16 as go-builder
+FROM golang:1.20.0-alpine3.16 as go-builder
 ENV CGO_ENABLED 0
 WORKDIR /go/src/
 RUN go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest
