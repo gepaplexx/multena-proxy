@@ -113,7 +113,7 @@ func main() {
 			case "openshift":
 				labels = labels_provider.GetLabelsFromRoleBindings(keycloakToken.PreferredUsername)
 			case "mysql":
-				labels = labels_provider.GetLabelsFromDB(keycloakToken.PreferredUsername)
+				labels = labels_provider.GetLabelsFromDB(keycloakToken.Email)
 			default:
 				utils.Logger.Panic("No provider set")
 			}

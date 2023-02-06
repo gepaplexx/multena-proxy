@@ -29,7 +29,7 @@ func InitializeLogger() {
 		"level": "` + strings.ToLower(os.Getenv("LOG_LEVEL")) + `",
 		"encoding": "json",
 		"outputPaths": ["stdout"],
-		"errorOutputPaths": ["stderr"],
+		"errorOutputPaths": ["stdout"],
 		"encoderConfig": {
 		  "messageKey": "message",
 		  "levelKey": "level",

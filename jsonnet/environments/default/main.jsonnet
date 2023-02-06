@@ -9,19 +9,19 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
     local rbac = k.rbac.v1.clusterRoleBinding,
 
   config+:: {
-    namespace: 'grafana-operator-system',
-    tenant_label: 'namespace',
-    upstream: 'https://thanos-querier.openshift-monitoring.svc.cluster.local:9091',
+    namespace: 'ocpc-35740',
+    tenant_label: 'tenant',
+    upstream: 'https://thanos-query.ocpc-35740.svc.cluster.local:8480',
     log_level: 'info',
     ns_proxy: {
-        name: 'ns-proxy',
+        name: 'multena-proxy',
         port: 8080,
         keycloak_client_secret: 'TO-BE-SET',
-        keycloak_cert_url: 'https://sso.apps.play.gepaplexx.com/realms/internal/protocol/openid-connect/certs',
-        token_exchange_url: 'https://sso.apps.play.gepaplexx.com/realms/internal/protocol/openid-connect/token',
-        admin_group: 'Gepaplexx',
+        keycloak_cert_url: 'https://user.apa.at/auth/realms/apa/protocol/openid-connect/certs',
+        token_exchange_url: '',
+        admin_group: 'IT-Betrieb',
         token_exhange: 'false',
-        provider: 'openshift',
+        provider: 'mysql',
     },
     prom_label_proxy:{
         name: 'prom-label-proxy',
@@ -37,7 +37,7 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
           container.new($.config.ns_proxy.name, 'ghcr.io/lucostus/namespace-proxy:sha-2d87a7b')
           + container.withPorts([port.new('http', $.config.ns_proxy.port)])
           + container.withEnvMap({
-            'UPSTREAM_URL': "http://"+$.prom_label_proxy.service.metadata.name+"."+$.config.namespace+".svc.cluster.local:"+$.config.prom_label_proxy.port,
+            'UPSTREAM_URL': "http://localhost:9095",
             'CLIENT_SECRET': $.config.ns_proxy.keycloak_client_secret,
             'DEV': "false",
             'PROVIDER': $.config.ns_proxy.provider,
@@ -48,9 +48,21 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
             'TOKEN_EXCHANGE_URL': $.config.ns_proxy.token_exchange_url,
             'KEYCLOAK_CERT_URL': $.config.ns_proxy.keycloak_cert_url,
             'ADMIN_GROUP': $.config.ns_proxy.admin_group,
-          })
+          }),
+          container.new("prom-label-proxy", "ghcr.io/lucostus/prom-label-proxy:multi-value-regex-v0.0.4")
+                  + container.withPorts([port.new('http', 9095)])
+                  + container.withArgsMixin([
+                  '--insecure-listen-address=0.0.0.0:9095',
+                  '--upstream='+ $.config.upstream,
+                  '--label=' + $.config.tenant_label,
+                  '--query-param=' + $.config.tenant_label,
+                  '--enable-label-apis',
+                  '--error-on-replace'
+                  ])
         ],
-      ),
+      )
+      + deployment.configVolumeMount('openshift-service-ca', '/etc/ssl/certs/', {}, {configMap: {name: "openshift-service-ca.crt"}}),
+
       service:
         k.util.serviceFor($.ns_proxy.deployment)
         + service.mixin.spec.withType('ClusterIP'),
@@ -76,22 +88,4 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
             + rbac.withSubjects({kind: 'ServiceAccount', name: $.config.ns_proxy.name, namespace: $.config.namespace})
       ]
     },
-
-  prom_label_proxy: {
-        deployment: deployment.new(name=$.config.prom_label_proxy.name, replicas=1, containers=[
-        container.new("prom-label-proxy", "ghcr.io/lucostus/prom-label-proxy:multi-value-regex-v0.0.4")
-        + container.withPorts([port.new('http', 9095)])
-        + container.withArgsMixin([
-        '--insecure-listen-address=0.0.0.0:9095',
-        '--upstream='+ $.config.upstream,
-        '--label=' + $.config.tenant_label,
-        '--query-param=' + $.config.tenant_label,
-        '--enable-label-apis',
-        '--error-on-replace'
-        ])])
-        + deployment.configVolumeMount('openshift-service-ca', '/etc/ssl/certs/', {}, {configMap: {name: "openshift-service-ca.crt"}}),
-        service:
-                k.util.serviceFor($.prom_label_proxy.deployment)
-                + service.mixin.spec.withType('ClusterIP'),
-  },
 }

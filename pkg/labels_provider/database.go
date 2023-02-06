@@ -5,9 +5,9 @@ import (
 	"github.com/gepaplexx/multena-proxy/pkg/utils"
 )
 
-func GetLabelsFromDB(username string) []string {
+func GetLabelsFromDB(email string) []string {
 	db := utils.DB
-	res, err := db.Query("SELECT * FROM user WHERE username = ?", username)
+	res, err := db.Query("SELECT * FROM user WHERE email = ?", email)
 	defer func(res *sql.Rows) {
 		err := res.Close()
 		utils.LogPanic("Error closing result", err)
