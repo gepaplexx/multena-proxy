@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/gepaplexx/multena-proxy/pkg/rewrite"
 	"io"
 	"net/http"
 	"net/url"
@@ -71,7 +72,7 @@ func main() {
 
 }
 
-func healthz(w http.ResponseWriter, r *http.Request) {
+func healthz(w http.ResponseWriter, _ *http.Request) {
 	utils.Logger.Debug("Healthz")
 	w.WriteHeader(http.StatusOK)
 	_, _ = fmt.Fprint(w, "Ok")
@@ -122,7 +123,10 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 
 			resp, err := http.DefaultClient.Do(tokenExchangeRequest)
 			utils.LogIfError("Error with doing token exchange request", err)
-			defer resp.Body.Close()
+			defer func(Body io.ReadCloser) {
+				err := Body.Close()
+				utils.LogIfError("Error closing token exchange body", err)
+			}(resp.Body)
 			b, err := io.ReadAll(resp.Body)
 			utils.LogIfError("Error parsing token exchange body", err)
 			utils.Logger.Debug("TokenExchange successful")
@@ -146,16 +150,9 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 			default:
 				utils.Logger.Panic("No provider set")
 			}
-
-			// save the response from the origin server
 			URL := req.URL.String()
-			quIn := strings.Index(URL, "?") + 1
-			labelsEnforcer := ""
-			for _, label := range labels {
-				labelsEnforcer += fmt.Sprintf("%s=%s&", tenantLabel, label)
-			}
-			req.URL, err = url.Parse(URL[:quIn] + labelsEnforcer + URL[quIn:])
-			utils.LogIfError("Error while creating the namespace url", err)
+			req.URL, err = url.Parse(rewrite.UrlRewriter(URL, labels, tenantLabel))
+			utils.LogIfError("Error while parsing url", err)
 
 			//proxy request to origin server
 			req.Host = originServerURL.Host
