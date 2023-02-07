@@ -6,7 +6,7 @@ require (
 	github.com/MicahParks/keyfunc v1.9.0
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/golang-jwt/jwt/v4 v4.4.3
-	github.com/google/gops v0.3.26
+	github.com/joho/godotenv v1.5.1
 	go.uber.org/zap v1.24.0
 	k8s.io/apimachinery v0.26.0
 	k8s.io/client-go v0.26.0

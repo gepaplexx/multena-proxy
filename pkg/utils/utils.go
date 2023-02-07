@@ -60,10 +60,8 @@ func LogError(msg string, err error) {
 
 func InitKubeClient() {
 	Logger.Info("Init Kubernetes Client")
-	sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
-	LogPanic("Failed to read service account token", err)
-	ServiceAccountToken = string(sa)
 	if os.Getenv("DEV") == "true" {
+		ServiceAccountToken = os.Getenv("SERVICE_ACCOUNT_TOKEN")
 		Logger.Info("Init Kubernetes Client with local kubeconfig")
 		var kubeconfig *string
 		if home := homedir.HomeDir(); home != "" {
@@ -79,6 +77,11 @@ func InitKubeClient() {
 		LogPanic("Kubeconfig error", err)
 	} else {
 		Logger.Info("Init Kubernetes Client with in cluster config")
+
+		sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+		LogPanic("Failed to read service account token", err)
+		ServiceAccountToken = string(sa)
+
 		// creates the in-cluster config
 		config, err := rest.InClusterConfig()
 		LogPanic("Kubeconfig error", err)
@@ -109,4 +112,13 @@ func InitJWKS() {
 	Jwks, err = keyfunc.Get(jwksURL, options)
 	LogPanic("Failed to create JWKS from resource at the given URL.", err)
 	Logger.Info("Finished Keycloak config")
+}
+
+func Contains[T comparable](s []T, e T) bool {
+	for _, v := range s {
+		if v == e {
+			return true
+		}
+	}
+	return false
 }
