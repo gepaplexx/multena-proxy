@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/gepaplexx/multena-proxy/pkg/labels_provider"
@@ -22,13 +21,10 @@ import (
 
 func init() {
 	err := godotenv.Load()
-	utils.InitializeLogger()
-
+	utils.InitLogging()
 	if err != nil && strings.ToLower(os.Getenv("DEV")) == "true" {
 		utils.Logger.Panic("Error loading .env file")
 	}
-
-	utils.Logger.Debug("Go Version", zap.String("version", runtime.Version()))
 
 	utils.Logger.Info("Init Proxy")
 	utils.Logger.Info("Set http client to ignore self signed certificates")
@@ -36,7 +32,43 @@ func init() {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	utils.InitJWKS()
 	utils.InitKubeClient()
+	utils.InitDB()
 	utils.Logger.Info("Init Complete")
+}
+
+func main() {
+	defer func(Logger *zap.Logger) {
+		err := Logger.Sync()
+		if err != nil {
+			fmt.Println("Error syncing logger", err)
+			panic(err)
+		}
+	}(utils.Logger)
+
+	utils.Logger.Info("Starting Proxy")
+	// define origin server URLs
+	originServerURL, err := url.Parse(os.Getenv("UPSTREAM_URL"))
+	utils.LogIfPanic("originServerURL must be set", err)
+	utils.Logger.Debug("Upstream URL", zap.String("url", originServerURL.String()))
+
+	originBypassServerURL, err := url.Parse(os.Getenv("UPSTREAM_BYPASS_URL"))
+	utils.LogIfPanic("OriginBypassServerURL must be set", err)
+	utils.Logger.Debug("Bypass Upstream URL", zap.String("url", originBypassServerURL.String()))
+
+	utils.Logger.Debug("Tenant Label", zap.String("label", os.Getenv("TENANT_LABEL")))
+	utils.Logger.Debug("TokenExchangeURL", zap.String("label", os.Getenv("TOKEN_EXCHANGE_URL")))
+
+	reverseProxy := configureProxy(originBypassServerURL, os.Getenv("TENANT_LABEL"), originServerURL, os.Getenv("TOKEN_EXCHANGE_URL"))
+
+	mux := http.NewServeMux()
+	mux.Handle("/healthz", http.HandlerFunc(healthz))
+	mux.Handle("/", reverseProxy)
+	go func() {
+		err := http.ListenAndServe("localhost:6060", nil)
+		utils.LogIfError("Error while serving pprof", err)
+	}()
+	utils.LogIfPanic("error while serving", http.ListenAndServe(":8080", mux))
+
 }
 
 func healthz(w http.ResponseWriter, r *http.Request) {
@@ -46,50 +78,7 @@ func healthz(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func main() {
-	defer func(Logger *zap.Logger) {
-		err := Logger.Sync()
-		if err != nil {
-			fmt.Println("Error syncing logger", err)
-		}
-	}(utils.Logger)
-	utils.Logger.Info("Starting Agent")
-
-	utils.Logger.Info("Finished Starting Agent")
-	utils.Logger.Info("Starting Proxy")
-	// define origin server URLs
-	originServerURL, err := url.Parse(os.Getenv("UPSTREAM_URL"))
-	if err != nil {
-		utils.LogPanic("originServerURL must be set", err)
-	}
-
-	utils.Logger.Debug("Upstream URL", zap.String("url", originServerURL.String()))
-	originBypassServerURL, err := url.Parse(os.Getenv("UPSTREAM_BYPASS_URL"))
-	if err != nil {
-		utils.LogPanic("OriginBypassServerURL must be set", err)
-	}
-
-	utils.Logger.Debug("Bypass Upstream URL", zap.String("url", originBypassServerURL.String()))
-	utils.Logger.Debug("Tenant Label", zap.String("label", os.Getenv("TENANT_LABEL")))
-	tenantLabel := os.Getenv("TENANT_LABEL")
-	tokenExchangeURL := os.Getenv("TOKEN_EXCHANGE_URL")
-	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		utils.Logger.Info("Received request", zap.String("request", fmt.Sprintf("%+v", req)))
-
-	reverseProxy := configureProxy(originBypassServerURL, tenantLabel, originServerURL)
-
-	mux := http.NewServeMux()
-	mux.Handle("/healthz", http.HandlerFunc(healthz))
-	mux.Handle("/", reverseProxy)
-	go func() {
-		err := http.ListenAndServe("localhost:6060", nil)
-		utils.LogError("Error while serving pprof", err)
-	}()
-	utils.LogPanic("error while serving", http.ListenAndServe(":8080", mux))
-
-}
-
-func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originServerURL *url.URL) http.HandlerFunc {
+func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originServerURL *url.URL, tokenExchangeURL string) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		utils.Logger.Info("Recived request", zap.String("request", fmt.Sprintf("%+v", req)))
 
@@ -106,7 +95,7 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 		token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, utils.Jwks.Keyfunc)
 		//if token invalid or expired, return 401
 
-		utils.LogError("Token Parsing error", err)
+		utils.LogIfError("Token Parsing error", err)
 		if !token.Valid {
 			rw.WriteHeader(http.StatusForbidden)
 			_, _ = fmt.Fprint(rw, "error while parsing token")
@@ -128,19 +117,19 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 			body := strings.NewReader(params.Encode())
 
 			tokenExchangeRequest, err := http.NewRequest("POST", tokenExchangeURL, body)
-			utils.LogError("Error with tokenExchangeRequest", err)
+			utils.LogIfError("Error with tokenExchangeRequest", err)
 			tokenExchangeRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 			resp, err := http.DefaultClient.Do(tokenExchangeRequest)
-			utils.LogError("Error with doing token exchange request", err)
+			utils.LogIfError("Error with doing token exchange request", err)
 			defer resp.Body.Close()
 			b, err := io.ReadAll(resp.Body)
-			utils.LogError("Error parsing token exchange body", err)
+			utils.LogIfError("Error parsing token exchange body", err)
 			utils.Logger.Debug("TokenExchange successful")
 
 			var result model.TokenExchange
 			err = json.Unmarshal(b, &result)
-			utils.LogError("Error unmarshalling TokenExchange struct", err)
+			utils.LogIfError("Error unmarshalling TokenExchange struct", err)
 			//request to bypass origin server
 			req.Host = originBypassServerURL.Host
 			req.URL.Host = originBypassServerURL.Host
@@ -166,7 +155,7 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 				labelsEnforcer += fmt.Sprintf("%s=%s&", tenantLabel, label)
 			}
 			req.URL, err = url.Parse(URL[:quIn] + labelsEnforcer + URL[quIn:])
-			utils.LogError("Error while creating the namespace url", err)
+			utils.LogIfError("Error while creating the namespace url", err)
 
 			//proxy request to origin server
 			req.Host = originServerURL.Host
@@ -183,24 +172,24 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 
 			rw.WriteHeader(http.StatusInternalServerError)
 			_, _ = fmt.Fprint(rw, err)
-			utils.LogError("Client request error", err)
+			utils.LogIfError("Client request error", err)
 			return
 		}
 
 		originBody, err := io.ReadAll(originServerResponse.Body)
-		utils.LogError("Error reading origin server response body", err)
+		utils.LogIfError("Error reading origin server response body", err)
 		utils.Logger.Debug("Upstream Response", zap.String("response", fmt.Sprintf("%+v", originServerResponse)), zap.String("body", fmt.Sprintf("%s", string(originBody))))
 
 		// return response to the client
 		rw.WriteHeader(http.StatusOK)
 		_, err = rw.Write(originBody)
-		utils.LogError("Error writing response to client", err)
+		utils.LogIfError("Error writing response to client", err)
 
 		utils.Logger.Debug("Finished Client request")
 
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
-			utils.LogError("Error closing body", err)
+			utils.LogIfError("Error closing body", err)
 		}(originServerResponse.Body)
 	}
 }

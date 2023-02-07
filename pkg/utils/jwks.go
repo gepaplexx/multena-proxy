@@ -5,12 +5,10 @@ import (
 	"time"
 
 	"github.com/MicahParks/keyfunc"
-	"k8s.io/client-go/kubernetes"
 )
 
 var (
-	ClientSet *kubernetes.Clientset
-	Jwks      *keyfunc.JWKS
+	Jwks *keyfunc.JWKS
 )
 
 func InitJWKS() {
@@ -19,7 +17,7 @@ func InitJWKS() {
 
 	options := keyfunc.Options{
 		RefreshErrorHandler: func(err error) {
-			LogError("There was an error with the jwt.Keyfunc", err)
+			LogIfError("There was an error with the jwt.Keyfunc", err)
 		},
 		RefreshInterval:   time.Hour,
 		RefreshRateLimit:  time.Minute * 5,
@@ -30,6 +28,6 @@ func InitJWKS() {
 	// Create the JWKS from the resource at the given URL.
 	err := error(nil)
 	Jwks, err = keyfunc.Get(jwksURL, options)
-	LogPanic("Failed to create JWKS from resource at the given URL.", err)
+	LogIfPanic("Failed to create JWKS from resource at the given URL.", err)
 	Logger.Info("Finished Keycloak config")
 }

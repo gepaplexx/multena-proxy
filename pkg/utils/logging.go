@@ -4,6 +4,7 @@ import (
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/json"
 	"os"
+	"runtime"
 	"strings"
 )
 
@@ -11,7 +12,7 @@ var (
 	Logger *zap.Logger
 )
 
-func initializeLogger() {
+func InitLogging() {
 	rawJSON := []byte(`{
 		"level": "` + strings.ToLower(os.Getenv("LOG_LEVEL")) + `",
 		"encoding": "json",
@@ -30,22 +31,17 @@ func initializeLogger() {
 	}
 	Logger = zap.Must(cfg.Build())
 
-	Logger.Info("logger construction succeeded")
+	Logger.Debug("logger construction succeeded")
+	Logger.Debug("Go Version", zap.String("version", runtime.Version()))
 }
 
-func LogPanic(msg string, err error) {
-	if Logger == nil {
-		initializeLogger()
+func LogIfPanic(msg string, err error) {
+	if err != nil {
+		Logger.Panic(msg, zap.String("error", err.Error()))
 	}
-	Logger.Panic(msg, zap.String("error", err.Error()))
-
 }
 
-func LogError(msg string, err error) {
-	if Logger == nil {
-		initializeLogger()
-	}
-
+func LogIfError(msg string, err error) {
 	if err != nil {
 		Logger.Error(msg, zap.String("error", err.Error()))
 	}

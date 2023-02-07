@@ -10,15 +10,15 @@ func GetLabelsFromDB(email string) []string {
 	res, err := db.Query("SELECT * FROM user WHERE email = ?", email)
 	defer func(res *sql.Rows) {
 		err := res.Close()
-		utils.LogPanic("Error closing result", err)
+		utils.LogIfPanic("Error closing result", err)
 	}(res)
-	utils.LogPanic("Error querying database", err)
+	utils.LogIfPanic("Error querying database", err)
 	labels := []string{}
 	if res.Next() {
 		err := res.Scan(&labels)
-		utils.LogPanic("Error scanning result", err)
+		utils.LogIfPanic("Error scanning result", err)
 	} else {
-		utils.LogError("Error no rows", err)
+		utils.LogIfError("Error no rows", err)
 	}
 	return labels
 

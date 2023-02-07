@@ -14,7 +14,7 @@ func GetLabelsFromRoleBindings(username string) []string {
 	rolebindings, err := utils.ClientSet.RbacV1().RoleBindings("").List(context.TODO(), metav1.ListOptions{
 		FieldSelector: "metadata.name=gp-dev",
 	})
-	utils.LogError("Error while using KubeAPI", err)
+	utils.LogIfError("Error while using KubeAPI", err)
 	var namespaces []string
 	for _, rb := range rolebindings.Items {
 		for _, user := range rb.Subjects {

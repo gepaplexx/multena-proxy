@@ -8,7 +8,7 @@ import (
 
 var DB *sql.DB
 
-func InitDBConnection() {
+func InitDB() {
 	cfg := mysql.Config{
 		User:   os.Getenv("DB_USER"),
 		Passwd: os.Getenv("DB_PASSWORD"),
@@ -19,10 +19,8 @@ func InitDBConnection() {
 	// Get a database handle.
 	var err error
 	DB, err = sql.Open("mysql", cfg.FormatDSN())
-	LogPanic("Error opening database", err)
+	LogIfPanic("Error opening database", err)
 	defer func(db *sql.DB) {
-		err := db.Close()
-		LogPanic("Error closing result", err)
+		LogIfPanic("Error closing result", db.Close())
 	}(DB)
-
 }
