@@ -23,9 +23,11 @@ import (
 func init() {
 	err := godotenv.Load()
 	utils.InitializeLogger()
+
 	if err != nil && strings.ToLower(os.Getenv("DEV")) == "true" {
 		utils.Logger.Panic("Error loading .env file")
 	}
+
 	utils.Logger.Debug("Go Version", zap.String("version", runtime.Version()))
 
 	utils.Logger.Info("Init Proxy")
@@ -57,16 +59,39 @@ func main() {
 	utils.Logger.Info("Starting Proxy")
 	// define origin server URLs
 	originServerURL, err := url.Parse(os.Getenv("UPSTREAM_URL"))
-	utils.LogPanic("originServerURL must be set", err)
+	if err != nil {
+		utils.LogPanic("originServerURL must be set", err)
+	}
+
 	utils.Logger.Debug("Upstream URL", zap.String("url", originServerURL.String()))
 	originBypassServerURL, err := url.Parse(os.Getenv("UPSTREAM_BYPASS_URL"))
-	utils.LogPanic("OriginBypassServerURL must be set", err)
+	if err != nil {
+		utils.LogPanic("OriginBypassServerURL must be set", err)
+	}
+
 	utils.Logger.Debug("Bypass Upstream URL", zap.String("url", originBypassServerURL.String()))
 	utils.Logger.Debug("Tenant Label", zap.String("label", os.Getenv("TENANT_LABEL")))
 	tenantLabel := os.Getenv("TENANT_LABEL")
 	tokenExchangeURL := os.Getenv("TOKEN_EXCHANGE_URL")
 	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		utils.Logger.Info("Received request", zap.String("request", fmt.Sprintf("%+v", req)))
+
+	reverseProxy := configureProxy(originBypassServerURL, tenantLabel, originServerURL)
+
+	mux := http.NewServeMux()
+	mux.Handle("/healthz", http.HandlerFunc(healthz))
+	mux.Handle("/", reverseProxy)
+	go func() {
+		err := http.ListenAndServe("localhost:6060", nil)
+		utils.LogError("Error while serving pprof", err)
+	}()
+	utils.LogPanic("error while serving", http.ListenAndServe(":8080", mux))
+
+}
+
+func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originServerURL *url.URL) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		utils.Logger.Info("Recived request", zap.String("request", fmt.Sprintf("%+v", req)))
 
 		if req.Header.Get("Authorization") == "" {
 			utils.Logger.Warn("No Authorization header found")
@@ -177,14 +202,5 @@ func main() {
 			err := Body.Close()
 			utils.LogError("Error closing body", err)
 		}(originServerResponse.Body)
-	})
-
-	mux := http.NewServeMux()
-	mux.Handle("/healthz", http.HandlerFunc(healthz))
-	mux.Handle("/", reverseProxy)
-	go func() {
-		err := http.ListenAndServe("localhost:6060", nil)
-		utils.LogError("Error while serving pprof", err)
-	}()
-	utils.LogPanic("error while serving", http.ListenAndServe(":8080", mux))
+	}
 }
