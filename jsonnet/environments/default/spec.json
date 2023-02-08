@@ -3,11 +3,11 @@
   "kind": "Environment",
   "metadata": {
     "name": "environments/prod",
-    "namespace": "grafana-operator-system"
+    "namespace": "ocpc-35740"
   },
   "spec": {
     "apiServer": "https://api.play.gepaplexx.com:6443",
-    "namespace": "grafana-operator-system",
+    "namespace": "ocpc-35740",
     "resourceDefaults": {},
     "expectVersions": {},
     "injectLabels": true

@@ -1,4 +1,15 @@
+*.iml
 .env
 /jsonnet/vendor
 ./jsonnet/vendor
 /jsonnet/vendor/
+./vendor
+./vendor/
+./vendor/*
+vendor
+vendor/
+multena-proxy
+multena-proxy.iml
+./.idea/
+.idea/
+.idea/*

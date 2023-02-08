@@ -9,17 +9,28 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
     local rbac = k.rbac.v1.clusterRoleBinding,
 
   config+:: {
-    namespace: 'grafana-operator-system',
-    tenant_label: 'namespace',
-    upstream: 'https://thanos-querier.openshift-monitoring.svc.cluster.local:9091',
+    namespace: 'ocpc-35740',
+    tenant_label: 'tenant',
+    upstream: 'https://thanos-query.ocpc-35740.svc.cluster.local:8480',
     log_level: 'info',
+    rbac: false,
     ns_proxy: {
-        name: 'ns-proxy',
+        name: 'multena-proxy',
         port: 8080,
-        keycloak_client_secret: 'TO-BE-SET',
-        keycloak_cert_url: 'https://sso.apps.play.gepaplexx.com/realms/internal/protocol/openid-connect/certs',
-        admin_group: 'Gepaplexx',
-        token_exhange: 'false',
+        enviorment: {
+                    'UPSTREAM_URL': "http://localhost:9095",
+                    'CLIENT_SECRET': "TO-BE-SET",
+                    'DEV': "false",
+                    'PROVIDER': "mysql",
+                    'LOG_LEVEL': "info",
+                    'TENANT_LABEL': $.config.tenant_label,
+                    'UPSTREAM_BYPASS_URL': $.config.upstream,
+                    'TOKEN_EXCHANGE': "false",
+                    'TOKEN_EXCHANGE_URL': "",
+                    'KEYCLOAK_CERT_URL': "https://user.apa.at/auth/realms/apa/protocol/openid-connect/certs",
+                    'ADMIN_GROUP': "IT-Betrieb",
+                    'DB_USER': "multitenant",
+                  }
     },
     prom_label_proxy:{
         name: 'prom-label-proxy',
@@ -34,19 +45,21 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
         containers=[
           container.new($.config.ns_proxy.name, 'ghcr.io/lucostus/namespace-proxy:sha-2d87a7b')
           + container.withPorts([port.new('http', $.config.ns_proxy.port)])
-          + container.withEnvMap({
-            'UPSTREAM_URL': "http://"+$.prom_label_proxy.service.metadata.name+"."+$.config.namespace+".svc.cluster.local:"+$.config.prom_label_proxy.port,
-            'CLIENT_SECRET': $.config.ns_proxy.keycloak_client_secret,
-            'DEV': "false",
-            'LOG_LEVEL': $.config.log_level,
-            'TENANT_LABEL': $.config.tenant_label,
-            'UPSTREAM_BYPASS_URL': $.config.upstream,
-            'TOKEN_EXCHANGE': $.config.ns_proxy.token_exhange,
-            'KEYCLOAK_CERT_URL': $.config.ns_proxy.keycloak_cert_url,
-            'ADMIN_GROUP': $.config.ns_proxy.admin_group,
-          })
+          + container.withEnvMap($.config.ns_proxy.enviorment),
+          container.new("prom-label-proxy", "ghcr.io/lucostus/prom-label-proxy:multi-value-regex-v0.0.4")
+                  + container.withPorts([port.new('http', 9095)])
+                  + container.withArgsMixin([
+                  '--insecure-listen-address=0.0.0.0:9095',
+                  '--upstream='+ $.config.upstream,
+                  '--label=' + $.config.tenant_label,
+                  '--query-param=' + $.config.tenant_label,
+                  '--enable-label-apis',
+                  '--error-on-replace'
+                  ])
         ],
-      ),
+      )
+      + deployment.configVolumeMount('openshift-service-ca', '/etc/ssl/certs/', {}, {configMap: {name: "openshift-service-ca.crt"}}),
+
       service:
         k.util.serviceFor($.ns_proxy.deployment)
         + service.mixin.spec.withType('ClusterIP'),
@@ -55,39 +68,23 @@ local k = import 'github.com/grafana/jsonnet-libs/ksonnet-util/kausal.libsonnet'
         sa.new($.config.ns_proxy.name)
         + sa.withAutomountServiceAccountToken(true),
 
-      role_bindings: [
-      rbac.new($.config.ns_proxy.name+"-cluster-monitoring-view")
-      + rbac.bindRole({
-                          metadata: {name: 'cluster-monitoring-view'},
-                          kind: 'ClusterRole',
-                          apiVersion: 'rbac.authorization.k8s.io/v1',
-                        })
-      + rbac.withSubjects({kind: 'ServiceAccount', name: $.config.ns_proxy.name, namespace: $.config.namespace}),
-      rbac.new($.config.ns_proxy.name+"-role-binding-access")
-            + rbac.bindRole({
-                                metadata: {name: 'system:openshift:controller:default-rolebindings-controller'},
-                                kind: 'ClusterRole',
-                                apiVersion: 'rbac.authorization.k8s.io/v1',
-                              })
-            + rbac.withSubjects({kind: 'ServiceAccount', name: $.config.ns_proxy.name, namespace: $.config.namespace})
-      ]
-    },
 
-  prom_label_proxy: {
-        deployment: deployment.new(name=$.config.prom_label_proxy.name, replicas=1, containers=[
-        container.new("prom-label-proxy", "ghcr.io/lucostus/prom-label-proxy:multi-value-regex-v0.0.4")
-        + container.withPorts([port.new('http', 9095)])
-        + container.withArgsMixin([
-        '--insecure-listen-address=0.0.0.0:9095',
-        '--upstream='+ $.config.upstream,
-        '--label=' + $.config.tenant_label,
-        '--query-param=' + $.config.tenant_label,
-        '--enable-label-apis',
-        '--error-on-replace'
-        ])])
-        + deployment.configVolumeMount('openshift-service-ca', '/etc/ssl/certs/', {}, {configMap: {name: "openshift-service-ca.crt"}}),
-        service:
-                k.util.serviceFor($.prom_label_proxy.deployment)
-                + service.mixin.spec.withType('ClusterIP'),
-  },
+      [if $.config.rbac then 'rolebindings' else null]: [if $.config.rbac then
+          rbac.new($.config.ns_proxy.name+"-cluster-monitoring-view")
+                + rbac.bindRole({
+                                    metadata: {name: 'cluster-monitoring-view'},
+                                    kind: 'ClusterRole',
+                                    apiVersion: 'rbac.authorization.k8s.io/v1',
+                                  })
+                + rbac.withSubjects({kind: 'ServiceAccount', name: $.config.ns_proxy.name, namespace: $.config.namespace}),
+                rbac.new($.config.ns_proxy.name+"-role-binding-access")
+                      + rbac.bindRole({
+                                          metadata: {name: 'system:openshift:controller:default-rolebindings-controller'},
+                                          kind: 'ClusterRole',
+                                          apiVersion: 'rbac.authorization.k8s.io/v1',
+                                        })
+                      + rbac.withSubjects({kind: 'ServiceAccount', name: $.config.ns_proxy.name, namespace: $.config.namespace})
+
+        ]
+    },
 }
