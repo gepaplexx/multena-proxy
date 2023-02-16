@@ -10,17 +10,21 @@ var DB *sql.DB
 
 func InitDB() {
 	cfg := mysql.Config{
-		User:   os.Getenv("DB_USER"),
-		Passwd: os.Getenv("DB_PASSWORD"),
-		Net:    "tcp",
-		Addr:   os.Getenv("DB_HOST") + ":" + os.Getenv("DB_PORT"),
-		DBName: os.Getenv("DB_NAME"),
+		User:                 os.Getenv("DB_USER"),
+		Passwd:               os.Getenv("DB_PASSWORD"),
+		Net:                  "tcp",
+		AllowNativePasswords: true,
+		Addr:                 os.Getenv("DB_HOST") + ":" + os.Getenv("DB_PORT"),
+		DBName:               os.Getenv("DB_NAME"),
 	}
 	// Get a database handle.
 	var err error
 	DB, err = sql.Open("mysql", cfg.FormatDSN())
 	LogIfPanic("Error opening database", err)
-	defer func(db *sql.DB) {
-		LogIfPanic("Error closing result", db.Close())
-	}(DB)
+}
+
+func CloseDB() {
+	if DB != nil {
+		LogIfPanic("Error closing result", DB.Close())
+	}
 }
