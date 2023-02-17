@@ -19,7 +19,7 @@ func UrlRewriter(URL string, labels []string, tenantLabel string) string {
 	for _, label := range labels {
 		labelsEnforcer += fmt.Sprintf("%s=%s&", tenantLabel, label)
 	}
-	if labelsEnforcer != "" {
+	if labelsEnforcer != "" && URL[quIn:] == "" {
 		labelsEnforcer = labelsEnforcer[:len(labelsEnforcer)-1]
 	}
 	url := URL[:quIn] + labelsEnforcer + URL[quIn:]
