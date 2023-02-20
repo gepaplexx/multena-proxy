@@ -62,7 +62,7 @@ jobs:
           type=semver,pattern={{version}},value=${{ steps.autotag.outputs.new-tag }}
           type=sha
         flavor: |
-          suffix=debug
+          suffix=-debug
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v2
