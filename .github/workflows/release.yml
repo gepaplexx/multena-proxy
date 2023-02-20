@@ -5,18 +5,44 @@ on:
     branches: [ main ]
     tags:
       - '*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-act
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '>=1.20.0'
+          cache: true
+      - name: Install dependencies
+        run: go get .
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        run: go test -v ./...
   push:
+    needs: [test, trivy]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - dockerfile: Containerfile
-            image: ghcr.io/gepaplexx/multena-proxy
-          - dockerfile: Containerfile.Debug
-            image: ghcr.io/gepaplexx/multena-proxy-debug
     steps:
     - uses: actions/checkout@v3
     - name: Set image name
@@ -28,8 +54,9 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
       continue-on-error: true
-        
+
     - name: Create a new release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: ncipollo/release-action@v1
       with:
         tag: ${{ steps.autotag.outputs.new-tag }}
@@ -42,7 +69,7 @@ jobs:
       with:
         # list of Docker images to use as base name for tags
         images: |
-          ${{ matrix.image }}
+          ghcr.io/${{ env.IMAGE_ID }}
         # generate Docker tags based on the following events/attributes
         tags: |
           type=schedule
@@ -79,24 +106,26 @@ jobs:
       id: docker_build
       uses: docker/build-push-action@v4
       with:
-        context: .
-        file: ${{ matrix.dockerfile }}
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         platforms: linux/amd64
         cache-from: type=gha
         cache-to: type=gha,mode=max
-  
+
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
       with:
-        image-ref: 'ghcr.io/gepaplexx/multena-proxy:${{ steps.docker_build.outputs.digest }}'
-        format: 'table'
-        exit-code: '1'
-        ignore-unfixed: true
-        vuln-type: 'os,library'
+        image-ref: 'ghcr.io/gepaplexx/multena-proxy:${{ steps.autotag.outputs.new-tag }}'
+        format: 'template'
+        template: '@/contrib/sarif.tpl'
+        output: 'trivy-results.sarif'
         severity: 'CRITICAL,HIGH'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
 
 
     - name: Image digest
