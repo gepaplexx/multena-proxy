@@ -1,12 +1,6 @@
-name: Publish new release
+name: Publish Debug Container
 
 on:
-  push:
-    branches: [ main ]
-    tags:
-      - '*'
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -39,7 +33,6 @@ jobs:
       - name: Test
         run: go test -v ./...
   push:
-    needs: [test, trivy]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -53,14 +46,6 @@ jobs:
       id: autotag
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-      continue-on-error: true
-
-    - name: Create a new release
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: ncipollo/release-action@v1
-      with:
-        tag: ${{ steps.autotag.outputs.new-tag }}
-        token: ${{ secrets.GITHUB_TOKEN }}
       continue-on-error: true
 
     - name: Docker meta
@@ -77,7 +62,7 @@ jobs:
           type=semver,pattern={{version}},value=${{ steps.autotag.outputs.new-tag }}
           type=sha
         flavor: |
-          latest=true
+          suffix=debug
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v2
@@ -98,7 +83,7 @@ jobs:
       id: docker_build
       uses: docker/build-push-action@v4
       with:
-        file: ./Containerfile
+        file: ./Containerfile.Debug
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
