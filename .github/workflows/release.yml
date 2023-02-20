@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-act
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -114,7 +114,7 @@ jobs:
         cache-to: type=gha,mode=max
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
+      uses: aquasecurity/trivy-action@master
       with:
         image-ref: 'ghcr.io/gepaplexx/multena-proxy:${{ steps.autotag.outputs.new-tag }}'
         format: 'template'
