@@ -48,7 +48,7 @@ func GetLabelsRBAC(username string, groups []string) []string {
 		sarResponse, err := utils.ClientSet.AuthorizationV1().SubjectAccessReviews().Create(context.Background(), &sar, metav1.CreateOptions{})
 		elapsed := time.Since(start)
 		utils.LogIfError("Error while using KubeAPI", err)
-		utils.Logger.Debug("SAR request took", zap.Any("time", elapsed))
+		utils.Logger.Debug("SAR request took ms", zap.Any("time", elapsed.Milliseconds()))
 		utils.Logger.Debug("SAR response", zap.Any("response", sarResponse))
 		if sarResponse.Status.Allowed {
 			allowedNamespaces = append(allowedNamespaces, ns)
