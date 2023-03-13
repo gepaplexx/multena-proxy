@@ -144,13 +144,17 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 		} else {
 			var labels []string
 			switch provider := os.Getenv("PROVIDER"); provider {
-			case "openshift":
+			case "rolebinding":
 				labels = labels_provider.GetLabelsFromRoleBindings(keycloakToken.PreferredUsername)
 			case "mysql":
 				labels = labels_provider.GetLabelsFromDB(keycloakToken.Email)
+			case "sar":
+				labels = labels_provider.GetLabelsRBAC(keycloakToken.PreferredUsername, keycloakToken.Groups)
 			default:
 				utils.Logger.Panic("No provider set")
 			}
+			utils.Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
+			utils.Logger.Debug("Labels", zap.String("labels", fmt.Sprintf("%+v", labels)))
 			URL := req.URL.String()
 			req.URL, err = url.Parse(rewrite.UrlRewriter(URL, labels, tenantLabel))
 			utils.LogIfError("Error while parsing url", err)
