@@ -3,7 +3,6 @@ package utils
 import (
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/json"
-	"os"
 	"runtime"
 	"strings"
 )
@@ -14,7 +13,7 @@ var (
 
 func InitLogging() {
 	rawJSON := []byte(`{
-		"level": "` + strings.ToLower(os.Getenv("LOG_LEVEL")) + `",
+		"level": "` + strings.ToLower(C.Proxy.LogLevel) + `",
 		"encoding": "json",
 		"outputPaths": ["stdout"],
 		"errorOutputPaths": ["stdout"],

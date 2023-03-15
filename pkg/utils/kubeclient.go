@@ -2,7 +2,6 @@ package utils
 
 import (
 	"flag"
-	"fmt"
 	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -14,15 +13,16 @@ import (
 
 var (
 	ClientSet           *kubernetes.Clientset
+	Config              *rest.Config
 	ServiceAccountToken string
 )
 
 func InitKubeClient() {
 	Logger.Info("Init Kubernetes Client")
 
-	if os.Getenv("DEV") == "true" {
+	if C.Dev.Enabled {
 		Logger.Info("Init Kubernetes Client with local kubeconfig")
-		ServiceAccountToken = os.Getenv("SERVICE_ACCOUNT_TOKEN")
+		ServiceAccountToken = C.Dev.ServiceAccountToken
 
 		var kubeconfig *string
 		if home := homedir.HomeDir(); home != "" {
@@ -32,10 +32,11 @@ func InitKubeClient() {
 		}
 		flag.Parse()
 
-		config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		err := error(nil)
+		Config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		LogIfPanic("Kubeconfig error", err)
 
-		ClientSet, err = kubernetes.NewForConfig(config)
+		ClientSet, err = kubernetes.NewForConfig(Config)
 		LogIfPanic("Kubeconfig error", err)
 
 	} else {
@@ -51,6 +52,6 @@ func InitKubeClient() {
 		ClientSet, err = kubernetes.NewForConfig(config)
 		LogIfPanic("Kubeconfig error", err)
 	}
-	Logger.Info("Kubeconfig", zap.String("config", fmt.Sprintf("%+v", ClientSet)))
+	Logger.Info("Kubeconfig", zap.Any("config", ClientSet))
 	Logger.Info("Finished Kubernetes Client")
 }

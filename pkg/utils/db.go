@@ -9,18 +9,21 @@ import (
 var DB *sql.DB
 
 func InitDB() {
-	cfg := mysql.Config{
-		User:                 os.Getenv("DB_USER"),
-		Passwd:               os.Getenv("DB_PASSWORD"),
-		Net:                  "tcp",
-		AllowNativePasswords: true,
-		Addr:                 os.Getenv("DB_HOST") + ":" + os.Getenv("DB_PORT"),
-		DBName:               os.Getenv("DB_NAME"),
+	if C.Db.Enabled {
+		password, err := os.ReadFile(C.Db.PasswordPath)
+		LogIfPanic("could not read db password", err)
+		cfg := mysql.Config{
+			User:                 C.Db.User,
+			Passwd:               string(password),
+			Net:                  "tcp",
+			AllowNativePasswords: true,
+			Addr:                 C.Db.Host + ":" + string(C.Db.Port),
+			DBName:               C.Db.DbName,
+		}
+		// Get a database handle.
+		DB, err = sql.Open("mysql", cfg.FormatDSN())
+		LogIfPanic("Error opening database", err)
 	}
-	// Get a database handle.
-	var err error
-	DB, err = sql.Open("mysql", cfg.FormatDSN())
-	LogIfPanic("Error opening database", err)
 }
 
 func CloseDB() {

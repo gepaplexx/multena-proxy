@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"os"
 	"time"
 
 	"github.com/MicahParks/keyfunc"
@@ -13,7 +12,7 @@ var (
 
 func InitJWKS() {
 	Logger.Info("Init Keycloak config")
-	jwksURL := os.Getenv("KEYCLOAK_CERT_URL")
+	jwksURL := C.Proxy.JwksCertURL
 
 	options := keyfunc.Options{
 		RefreshErrorHandler: func(err error) {
