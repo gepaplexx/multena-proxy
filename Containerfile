@@ -9,7 +9,7 @@ RUN go mod verify
 COPY . .
 RUN go build .
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7-1085
 WORKDIR /app/
 ENV GOPS_CONFIG_DIR /app/.config
 RUN mkdir /app/.config
