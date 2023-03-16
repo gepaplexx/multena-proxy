@@ -80,6 +80,12 @@ jobs:
     - name: move from cache
       run: mv ./.cache/multena-proxy ./multena-proxy
 
+    - name: ls
+      run: ls ./.cache -la
+
+    - name: ls
+      run: ls -la
+
     - name: Set image name
       run: echo "IMAGE_ID=$(echo ${{ github.repository }} | tr '[A-Z]' '[a-z]')" >> $GITHUB_ENV
 
