@@ -58,6 +58,7 @@ jobs:
           path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
           key: multena-proxy-${{ github.run_id }}
           restore-keys: multena-proxy-
+
   push:
     needs: [build-and-test, trivy]
     runs-on: ubuntu-latest
@@ -77,7 +78,7 @@ jobs:
       run: ls -la
 
     - name: move from cache
-      run: mv ./.cache/multena-proxy-${{ github.run_id }} ./multena-proxy
+      run: mv ./.cache/multena-proxy ./multena-proxy
 
     - name: Set image name
       run: echo "IMAGE_ID=$(echo ${{ github.repository }} | tr '[A-Z]' '[a-z]')" >> $GITHUB_ENV
