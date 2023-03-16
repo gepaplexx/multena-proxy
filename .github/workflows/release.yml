@@ -45,7 +45,7 @@ jobs:
         run: go get .
 
       - name: Build
-        run: go build -v ./...
+        run: go build -o ./.cache/ -v ./...
 
       - name: Test
         run: go test -v ./...
@@ -53,12 +53,9 @@ jobs:
       - name: ls
         run: ls -la
 
-      - name: move to cache
-        run: mkdir cache && mv multena-proxy ./cache
-
       - uses: actions/cache@v3
         with:
-          path: ./cache  # Note that this path is not influenced by working-directory set in defaults, for example
+          path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
           key: multena-proxy-${{ github.run_id }}
           restore-keys: multena-proxy-
   push:
@@ -70,10 +67,10 @@ jobs:
     - uses: actions/checkout@v3
     - uses: actions/cache@v3
       with:
-        path: ./cache  # Note that this path is not influenced by working-directory set in defaults, for example
+        path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
         key: multena-proxy-${{ github.run_id }}
     - name: move from cache
-      run: mv ./cache/multena-proxy .
+      run: mv ./.cache/multena-proxy .
 
     - name: Set image name
       run: echo "IMAGE_ID=$(echo ${{ github.repository }} | tr '[A-Z]' '[a-z]')" >> $GITHUB_ENV
