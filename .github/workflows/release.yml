@@ -24,6 +24,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH, MEDIUM, LOW'
+          exit-code: '1'
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v2
@@ -50,9 +51,6 @@ jobs:
       - name: Test
         run: go test -v ./...
 
-      - name: ls
-        run: ls -la
-
       - uses: actions/cache@v3
         with:
           path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
@@ -71,20 +69,8 @@ jobs:
         path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
         key: multena-proxy-${{ github.run_id }}
 
-    - name: ls
-      run: ls ./.cache -la
-
-    - name: ls
-      run: ls -la
-
     - name: move from cache
       run: mv ./.cache/multena-proxy ./multena-proxy
-
-    - name: ls
-      run: ls ./.cache -la
-
-    - name: ls
-      run: ls -la
 
     - name: Set image name
       run: echo "IMAGE_ID=$(echo ${{ github.repository }} | tr '[A-Z]' '[a-z]')" >> $GITHUB_ENV
@@ -144,15 +130,16 @@ jobs:
       uses: aquasecurity/trivy-action@master
       with:
         input: './multena-proxy-oci'
-        format: 'template'
-        template: '@/contrib/sarif.tpl'
+        format: 'sarif'
         output: 'trivy-results.sarif'
         severity: 'CRITICAL,HIGH, MEDIUM, LOW'
+        exit-code: '1'
 
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v2
       with:
         sarif_file: 'trivy-results.sarif'
+        category: 'container'
 
     - name: Image digest
       run: echo ${{ steps.docker_build.outputs.digest }}
