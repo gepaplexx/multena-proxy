@@ -50,6 +50,9 @@ jobs:
       - name: Test
         run: go test -v ./...
 
+      - name: ls
+        run: ls -la
+
       - name: move to cache
         run: mkdir cache && mv multena-proxy ./cache
 
