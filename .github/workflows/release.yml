@@ -138,12 +138,12 @@ jobs:
 
     - name: Build image
       run: |
-        buildah push ghcr.io/gepaplexx/multena-proxy:${{ steps.autotag.outputs.new-tag }} oci:./tmp/multena-proxy
+        buildah push ghcr.io/gepaplexx/multena-proxy:${{ steps.autotag.outputs.new-tag }} oci:./multena-proxy-oci
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
-        input: './tmp/multena-proxy'
+        input: './multena-proxy-oci'
         format: 'template'
         template: '@/contrib/sarif.tpl'
         output: 'trivy-results.sarif'
