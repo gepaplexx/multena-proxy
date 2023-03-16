@@ -69,7 +69,13 @@ jobs:
       with:
         path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
         key: multena-proxy-${{ github.run_id }}
-        restore-keys: multena-proxy-
+
+    - name: ls
+      run: ls ./.cache -la
+
+    - name: ls
+      run: ls -la
+
     - name: move from cache
       run: mv ./.cache/multena-proxy-${{ github.run_id }} ./multena-proxy
 
