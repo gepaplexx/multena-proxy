@@ -2,6 +2,7 @@ package utils
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"os"
 )
@@ -17,7 +18,7 @@ func InitDB() {
 			Passwd:               string(password),
 			Net:                  "tcp",
 			AllowNativePasswords: true,
-			Addr:                 C.Db.Host + ":" + string(C.Db.Port),
+			Addr:                 C.Db.Host + ":" + fmt.Sprint(C.Db.Port),
 			DBName:               C.Db.DbName,
 		}
 		// Get a database handle.

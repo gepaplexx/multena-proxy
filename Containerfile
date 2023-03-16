@@ -1,4 +1,7 @@
 FROM golang:1.20.0-alpine3.17 as go-builder
+
+LABEL maintainer="Winkler@Gepardec"
+
 WORKDIR /app/multena-proxy
 RUN apk add --no-cache gcc g++ make
 COPY go.mod go.sum ./
