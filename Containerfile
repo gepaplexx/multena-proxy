@@ -6,8 +6,7 @@ RUN go mod verify
 COPY . .
 RUN go build .
 
-FROM alpine:3.17
-RUN apk add --no-cache ca-certificates curl wget bash
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8
 WORKDIR /app/
 ENV GOPS_CONFIG_DIR /app/.config
 RUN mkdir /app/.config
