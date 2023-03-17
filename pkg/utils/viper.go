@@ -7,17 +7,12 @@ import (
 )
 
 type Cfg struct {
-	Dev struct {
+	Version int `mapstructure:"version"`
+	Dev     struct {
 		Enabled             bool   `mapstructure:"enabled"`
 		ServiceAccountToken string `mapstructure:"service_account_token"`
 	} `mapstructure:"dev"`
-	TokenExchange struct {
-		Enabled      bool   `mapstructure:"enabled"`
-		ClientSecret string `mapstructure:"client_secret"`
-		URL          string `mapstructure:"url"`
-	} `mapstructure:"token_exchange"`
 	Proxy struct {
-		Version           int    `mapstructure:"version"`
 		LogLevel          string `mapstructure:"log_level"`
 		Provider          string `mapstructure:"provider"`
 		UpstreamURL       string `mapstructure:"upstream_url"`
@@ -34,7 +29,8 @@ type Cfg struct {
 		Port         int    `mapstructure:"port"`
 		DbName       string `mapstructure:"db_name"`
 	} `mapstructure:"db"`
-	Users map[string][]string `mapstructure:"users"`
+	Users  map[string][]string `mapstructure:"users"`
+	Groups map[string][]string `mapstructure:"groups"`
 }
 
 var (
@@ -42,43 +38,48 @@ var (
 	V *viper.Viper
 )
 
-func InitViper() {
+func onConfigChange(e fsnotify.Event) {
+	//Todo: change log level on reload
 	C = &Cfg{}
-	V = viper.New()
-	V.SetConfigName("config")       // name of config file (without extension)
+	configs := []string{"config", "users", "groups"}
+	for _, name := range configs {
+		V.SetConfigName(name) // name of config file (without extension)
+		err := V.MergeInConfig()
+		err = V.Unmarshal(C)
+		if err != nil { // Handle errors reading the config file
+			panic(fmt.Errorf("fatal error config file: %w", err))
+		}
+	}
+	fmt.Printf("%+v", C)
+	fmt.Println("Config file changed:", e.Name)
+
+}
+
+func loadConfig(configName string) {
+	V.SetConfigName(configName)     // name of config file (without extension)
 	V.SetConfigType("yaml")         // REQUIRED if the config file does not have the extension in the name
 	V.AddConfigPath("/etc/config/") // path to look for the config file in
 	V.AddConfigPath("./")
-	err := V.ReadInConfig() // Find and read the config file
-	if err != nil {         // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %w", err))
-	}
-	V.OnConfigChange(func(e fsnotify.Event) {
-		err = V.Unmarshal(C)
-		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("fatal error config file: %w", err))
-		}
-		fmt.Println("Config file changed:", e.Name)
-	})
-	V.WatchConfig()
-	V.SetConfigName("users")
-	V.SetConfigType("yaml")
-	V.AddConfigPath("/etc/config/")
-	V.AddConfigPath("./")
-	err = V.MergeInConfig()
-	if err != nil { // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %w", err))
+	err := V.MergeInConfig() // Find and read the config file
+	if V.GetInt("version") == 1 {
+		fmt.Println("Using v1 config")
+	} else {
+		fmt.Println("Supported versions: 1")
+		panic("Unsupported config version")
 	}
 	err = V.Unmarshal(C)
+	fmt.Printf("%+v", C)
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
-	V.OnConfigChange(func(e fsnotify.Event) {
-		err = V.Unmarshal(C)
-		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("fatal error config file: %w", err))
-		}
-		fmt.Println("Config file changed:", e.Name)
-	})
+	V.OnConfigChange(onConfigChange)
 	V.WatchConfig()
+}
+
+func InitViper() {
+	C = &Cfg{}
+	V = viper.New()
+	loadConfig("config")
+	loadConfig("users")
+	loadConfig("groups")
 }

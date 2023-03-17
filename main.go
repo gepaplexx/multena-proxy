@@ -39,19 +39,8 @@ func main() {
 	}(utils.Logger)
 
 	utils.Logger.Info("Starting Proxy")
-	// define origin server URLs
-	originServerURL, err := url.Parse(utils.C.Proxy.UpstreamURL)
-	utils.LogIfPanic("originServerURL must be set", err)
-	utils.Logger.Debug("Upstream URL", zap.String("url", originServerURL.String()))
 
-	originBypassServerURL, err := url.Parse(utils.C.Proxy.UpstreamBypassURL)
-	utils.LogIfPanic("OriginBypassServerURL must be set", err)
-	utils.Logger.Debug("Bypass Upstream URL", zap.String("url", originBypassServerURL.String()))
-
-	utils.Logger.Debug("Tenant Label", zap.String("label", utils.C.Proxy.TenantLabel))
-	utils.Logger.Debug("TokenExchangeURL", zap.String("label", utils.C.TokenExchange.URL))
-
-	reverseProxy := configureProxy(originBypassServerURL, utils.C.Proxy.TenantLabel, originServerURL, utils.C.TokenExchange.URL)
+	reverseProxy := configureProxy(utils.C.Proxy.TenantLabel)
 
 	mux := http.NewServeMux()
 	mux.Handle("/healthz", http.HandlerFunc(healthz))
@@ -62,7 +51,6 @@ func main() {
 		defer utils.CloseDB()
 	}()
 	utils.LogIfPanic("error while serving", http.ListenAndServe(":8080", mux))
-
 }
 
 func healthz(w http.ResponseWriter, _ *http.Request) {
@@ -72,9 +60,9 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 	return
 }
 
-func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originServerURL *url.URL, tokenExchangeURL string) http.HandlerFunc {
+func configureProxy(tenantLabel string) http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
-		utils.Logger.Info("Recived request", zap.Any("request", req))
+		utils.Logger.Info("Received request", zap.Any("request", req))
 
 		if req.Header.Get("Authorization") == "" {
 			utils.Logger.Warn("No Authorization header found")
@@ -84,25 +72,29 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 		}
 
 		//parse jwt from request
-		tokenString := string(req.Header.Get("Authorization"))[7:]
-		var keycloakToken model.KeycloakToken
-		token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, utils.Jwks.Keyfunc)
-		//if token invalid or expired, return 401
-
-		utils.LogIfError("Token Parsing error", err)
-		if !token.Valid && !utils.C.Dev.Enabled {
+		if len(req.Header.Get("Authorization")) < 7 {
 			rw.WriteHeader(http.StatusForbidden)
 			_, _ = fmt.Fprint(rw, "error while parsing token")
-			utils.Logger.Warn("Invalid token", zap.Any("token", token))
+			return
+		}
+		tokenString := req.Header.Get("Authorization")[7:]
+		var keycloakToken model.KeycloakToken
+		token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, utils.Jwks.Keyfunc)
+		utils.LogIfError("Token Parsing error", err)
+
+		//if token invalid or expired, return 401
+		if !token.Valid && !utils.C.Dev.Enabled {
+			rw.WriteHeader(http.StatusForbidden)
+			utils.Logger.Debug("Invalid token", zap.Any("token", token))
+			_, _ = fmt.Fprint(rw, "error while parsing token")
 			return
 		}
 
 		//if user in admin group
-		if utils.Contains(keycloakToken.Groups, utils.C.Proxy.AdminGroup) || utils.Contains(keycloakToken.ApaGroupsOrg, utils.C.Proxy.AdminGroup) {
-			req.Host = originBypassServerURL.Host
-			req.URL.Host = originBypassServerURL.Host
-			req.URL.Scheme = originBypassServerURL.Scheme
-			req.Header.Set("Authorization", "Bearer "+utils.ServiceAccountToken)
+		var upstreamUrl *url.URL
+		if utils.ContainsIgnoreCase(keycloakToken.Groups, utils.C.Proxy.AdminGroup) || utils.ContainsIgnoreCase(keycloakToken.ApaGroupsOrg, utils.C.Proxy.AdminGroup) {
+			upstreamUrl, err = url.Parse(utils.C.Proxy.UpstreamBypassURL)
+			utils.LogIfError("Error while parsing upstream url", err)
 		} else {
 			var labels []string
 			switch provider := utils.C.Proxy.Provider; provider {
@@ -111,22 +103,27 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 			case "mysql":
 				labels = labels_provider.GetLabelsFromDB(keycloakToken.Email)
 			case "configmap":
-				labels = labels_provider.GetLabelsCM(keycloakToken.PreferredUsername)
+				labels = labels_provider.GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
 			default:
 				utils.Logger.Panic("No provider set")
 			}
+
 			utils.Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
 			utils.Logger.Debug("Labels", zap.Any("labels", labels))
+
 			URL := req.URL.String()
 			req.URL, err = url.Parse(rewrite.UrlRewriter(URL, labels, tenantLabel))
 			utils.LogIfError("Error while parsing url", err)
 
 			//proxy request to origin server
-			req.Host = originServerURL.Host
-			req.URL.Host = originServerURL.Host
-			req.URL.Scheme = originServerURL.Scheme
-			req.Header.Set("Authorization", "Bearer "+utils.ServiceAccountToken)
+			upstreamUrl, err = url.Parse(utils.C.Proxy.UpstreamURL)
+			utils.LogIfError("Error while parsing upstream url", err)
 		}
+
+		req.Host = upstreamUrl.Host
+		req.URL.Host = upstreamUrl.Host
+		req.URL.Scheme = upstreamUrl.Scheme
+		req.Header.Set("Authorization", "Bearer "+utils.ServiceAccountToken)
 
 		//clear request URI
 		utils.Logger.Debug("Client request", zap.Any("request", req))
@@ -149,7 +146,6 @@ func configureProxy(originBypassServerURL *url.URL, tenantLabel string, originSe
 		utils.LogIfError("Error writing response to client", err)
 
 		utils.Logger.Debug("Finished Client request")
-
 		defer func(Body io.ReadCloser) {
 			err := Body.Close()
 			utils.LogIfError("Error closing body", err)

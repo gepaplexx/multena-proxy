@@ -1,4 +1,3 @@
 users:
-  - lucostus: [dev,dev2]
-  - nein: [dev,dev2]
+  - lucostus: [lucostus]
   - uff: [dev,dev2]
