@@ -8,6 +8,8 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: '20 8 * * 4'
 
 jobs:
   scan-code:
