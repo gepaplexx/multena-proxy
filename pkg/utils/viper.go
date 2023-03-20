@@ -20,6 +20,7 @@ type Cfg struct {
 		JwksCertURL       string `mapstructure:"jwks_cert_url"`
 		TenantLabel       string `mapstructure:"tenant_label"`
 		AdminGroup        string `mapstructure:"admin_group"`
+		Port              int    `mapstructure:"port"`
 	} `mapstructure:"proxy"`
 	Db struct {
 		Enabled      bool   `mapstructure:"enabled"`

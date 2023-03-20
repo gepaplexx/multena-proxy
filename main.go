@@ -50,7 +50,8 @@ func main() {
 		utils.LogIfError("Error while serving pprof", err)
 		defer utils.CloseDB()
 	}()
-	utils.LogIfPanic("error while serving", http.ListenAndServe(":8080", mux))
+	err := http.ListenAndServe(fmt.Sprintf(":%d", utils.C.Proxy.Port), mux)
+	utils.LogIfPanic("error while serving", err)
 }
 
 func healthz(w http.ResponseWriter, _ *http.Request) {
