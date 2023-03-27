@@ -115,7 +115,7 @@ jobs:
         image: ${{ env.IMAGE_NAME }}
         tags: ${{ steps.meta.outputs.tags }}
         containerfiles: |
-          ./Containerfile
+          ./build/Containerfile
 
     - name: Log in to the GitHub Container registry
       uses: redhat-actions/podman-login@v1
