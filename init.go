@@ -33,7 +33,7 @@ var (
 	V                   *viper.Viper
 )
 
-func init() {
+func doInit() {
 
 	InitConfig()
 	InitLogging()
