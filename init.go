@@ -50,7 +50,7 @@ func doInit() {
 
 func InitConfig() {
 	C = &Cfg{}
-	V = viper.New()
+	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
 	loadConfig("config")
 	loadConfig("users")
 	loadConfig("groups")
