@@ -1,5 +1,5 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7-1085
-RUN yum -y install iputils vim && yum clean all
+RUN microdnf update && microdnf install iputils vim
 WORKDIR /app/
 ENV GOPS_CONFIG_DIR /app/.config
 RUN mkdir /app/.config
