@@ -74,9 +74,9 @@ func onConfigChange(e fsnotify.Event) {
 }
 
 func loadConfig(configName string) {
-	V.SetConfigName(configName)                                      // name of config file (without extension)
-	V.SetConfigType("yaml")                                          // REQUIRED if the config file does not have the extension in the name
-	V.AddConfigPath(fmt.Sprintf("/etc/config/%s.yaml/", configName)) // path to look for the config file in
+	V.SetConfigName(configName)                                                     // name of config file (without extension)
+	V.SetConfigType("yaml")                                                         // REQUIRED if the config file does not have the extension in the name
+	V.AddConfigPath(fmt.Sprintf("/etc/config/%s/%s.yaml/", configName, configName)) // path to look for the config file in
 	V.AddConfigPath("./configs")
 	err := V.MergeInConfig() // Find and read the config file
 	if V.GetInt("version") == 1 {
