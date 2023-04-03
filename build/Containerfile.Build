@@ -5,7 +5,7 @@ RUN go mod verify
 COPY . .
 RUN go build .
 
-FROM registry.access.redhat.com/ubi9/ubi-micro:9.1
+FROM registry.access.redhat.com/ubi9/ubi-micro:9.1.0-15
 EXPOSE 8080
 WORKDIR /app/
 COPY --from=go-builder /app/multena-proxy/multena-proxy .
