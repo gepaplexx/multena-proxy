@@ -53,10 +53,10 @@ jobs:
         run: go get .
 
       - name: Build
-        run: CGO_ENABLED=0 go build -o . -v ./...
+        run: go build -o . -v ./...
 
       - name: Copy build
-        run: cp ./multena-proxy ./.cache/multena-proxy
+        run: mkdir ./.cache && cp ./multena-proxy ./.cache/multena-proxy
 
       - name: Test
         run: go test -v ./...
