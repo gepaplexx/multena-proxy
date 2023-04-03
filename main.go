@@ -70,6 +70,11 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		_, _ = fmt.Fprint(rw, "error while parsing token")
 		return
 	}
+	if "X-Plugin-Id: loki" == req.Header.Get("X-Plugin-Id") {
+		Logger.Debug("Loki request")
+		_, _ = io.WriteString(rw, "Loki request")
+		return
+	}
 
 	//if user in admin group
 	var upstreamUrl *url.URL
@@ -94,17 +99,26 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
 		Logger.Debug("Labels", zap.Any("labels", labels))
 
-		URL := req.URL.String()
-		req.URL, err = url.Parse(UrlRewriter(URL, labels, C.Proxy.TenantLabel))
-		if err != nil {
-			Logger.Error("Error parsing rewritten url", zap.Error(err))
+		if req.Header.Get("X-Plugin-Id") == "loki" {
+			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURLLoki)
+			HeaderRewriter(req, labels)
+			if err != nil {
+				Logger.Error("Error parsing upstream url", zap.Error(err))
+			}
+		} else {
+			URL := req.URL.String()
+			req.URL, err = url.Parse(UrlRewriter(URL, labels, C.Proxy.TenantLabel))
+			if err != nil {
+				Logger.Error("Error parsing rewritten url", zap.Error(err))
+			}
+
+			//proxy request to origin server
+			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURL)
+			if err != nil {
+				Logger.Error("Error parsing upstream url", zap.Error(err))
+			}
 		}
 
-		//proxy request to origin server
-		upstreamUrl, err = url.Parse(C.Proxy.UpstreamURL)
-		if err != nil {
-			Logger.Error("Error parsing upstream url", zap.Error(err))
-		}
 	}
 
 	req.Host = upstreamUrl.Host

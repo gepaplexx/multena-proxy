@@ -75,18 +75,17 @@ func onConfigChange(e fsnotify.Event) {
 func loadConfig(configName string) {
 	V.SetConfigName(configName) // name of config file (without extension)
 	V.SetConfigType("yaml")
-	fmt.Println("Looking for config in", fmt.Sprintf("/etc/config/%s/", configName)) // REQUIRED if the config file does not have the extension in the name
-	V.AddConfigPath(fmt.Sprintf("/etc/config/%s/", configName))                      // path to look for the config file in
+	fmt.Sprintf("{\"level\":\"info\",\"message\":\"Looking for config in /etc/config/%s/\"}", configName)
+	V.AddConfigPath(fmt.Sprintf("/etc/config/%s/", configName))
 	V.AddConfigPath("./configs")
 	err := V.MergeInConfig() // Find and read the config file
-	if V.GetInt("version") == 1 {
-		fmt.Println("Using v1 config")
+	if V.GetInt("version") == 2 {
+		fmt.Println("{\"level\":\"info\",\"message\":\"Using v2 config\"}")
 	} else {
-		fmt.Println("Supported versions: 1")
+		fmt.Println("{\"level\":\"error\",\"message\":\"Unsupported config version\"}")
 		panic("Unsupported config version")
 	}
 	err = V.Unmarshal(C)
-	fmt.Printf("%+v", C)
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
@@ -118,6 +117,8 @@ func InitLogging() *zap.Logger {
 
 	Logger.Debug("logger construction succeeded")
 	Logger.Debug("Go Version", zap.String("version", runtime.Version()))
+	Logger.Debug("Go OS/Arch", zap.String("os", runtime.GOOS), zap.String("arch", runtime.GOARCH))
+	Logger.Debug("Config", zap.Any("cfg", C))
 	return Logger
 }
 

@@ -12,6 +12,7 @@ type Cfg struct {
 		LogLevel          string `mapstructure:"log_level"`
 		Provider          string `mapstructure:"provider"`
 		UpstreamURL       string `mapstructure:"upstream_url"`
+		UpstreamURLLoki   string `mapstructure:"upstream_url_loki"`
 		UpstreamBypassURL string `mapstructure:"upstream_bypass_url"`
 		JwksCertURL       string `mapstructure:"jwks_cert_url"`
 		TenantLabel       string `mapstructure:"tenant_label"`
