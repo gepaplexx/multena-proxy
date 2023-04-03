@@ -5,4 +5,5 @@ USER 1001
 WORKDIR /app/
 COPY  ./multena-proxy .
 #RUN chgrp -R 0 /app && chmod -R g=u /app
+HEALTHCHECK --timeout=10s CMD curl --fail http://localhost:8080/healthz || exit 1
 ENTRYPOINT [ "/app/multena-proxy" ]
