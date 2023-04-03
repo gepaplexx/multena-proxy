@@ -34,7 +34,6 @@ var (
 )
 
 func doInit() {
-
 	InitConfig()
 	InitLogging()
 	Logger.Info("Init Proxy")
