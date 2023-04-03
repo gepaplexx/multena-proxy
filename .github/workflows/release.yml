@@ -48,10 +48,10 @@ jobs:
         run: go get .
 
       - name: Build
-        run: CGO_ENABLED=0 go build -o ./.cache/ -v ./...
+        run: CGO_ENABLED=0 go build -o . -v ./...
 
       - name: Copy build
-        run: cp ./.cache/multena-proxy ./multena-proxy
+        run: cp ./multena-proxy ./.cache/multena-proxy
 
       - name: Test
         run: go test -v ./...
@@ -60,7 +60,6 @@ jobs:
         with:
           path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
           key: multena-proxy-${{ github.run_id }}
-          restore-keys: multena-proxy-
 
   push:
     needs: [build-and-test, scan-code]
@@ -73,6 +72,7 @@ jobs:
       with:
         path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
         key: multena-proxy-${{ github.run_id }}
+        fail-on-cache-miss: true
 
     - name: move from cache
       run: mv ./.cache/multena-proxy ./multena-proxy
