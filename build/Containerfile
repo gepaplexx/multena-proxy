@@ -1,4 +1,5 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7-1085
+RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
 WORKDIR /app/
 ENV GOPS_CONFIG_DIR /app/.config
 RUN mkdir /app/.config
