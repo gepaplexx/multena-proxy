@@ -124,9 +124,15 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build image
+    - name: push image to trivy
       run: |
-        buildah push ghcr.io/gepaplexx/multena-proxy:${{ steps.autotag.outputs.new-tag }} oci:./multena-proxy-oci
+        if [ -z "${{ steps.autotag.outputs.new-tag }}" ]; then
+          echo "No new tag found, using latest"
+          buildah push ghcr.io/gepaplexx/multena-proxy:pr oci:./multena-proxy-oci
+        else
+          echo "New tag found, using ${{ steps.autotag.outputs.new-tag }}"
+          buildah push ghcr.io/gepaplexx/multena-proxy:${{ steps.autotag.outputs.new-tag }} oci:./multena-proxy-oci
+        fi
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
