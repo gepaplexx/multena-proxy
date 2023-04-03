@@ -3,7 +3,6 @@ FROM registry.access.redhat.com/ubi9/go-toolset as go-builder
 LABEL maintainer="Winkler@Gepardec"
 
 WORKDIR /app/multena-proxy
-RUN apk add --no-cache gcc g++ make
 COPY go.mod go.sum ./
 RUN go mod verify
 COPY . .
@@ -11,10 +10,7 @@ RUN go build .
 
 FROM registry.access.redhat.com/ubi9/ubi-micro:9.1
 EXPOSE 8080
-USER 1001
 WORKDIR /app/
-ENV GOPS_CONFIG_DIR /app/.config
-RUN mkdir /app/.config
 COPY --from=go-builder /app/multena-proxy/multena-proxy .
-RUN chgrp -R 0 /app && chmod -R g=u /app
+USER 1001
 ENTRYPOINT [ "/app/multena-proxy" ]
