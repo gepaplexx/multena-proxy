@@ -126,13 +126,7 @@ jobs:
 
     - name: push image to trivy
       run: |
-        if [ -z "${{ steps.autotag.outputs.new-tag }}" ]; then
-          echo "No new tag found, using latest"
-          buildah push ghcr.io/gepaplexx/multena-proxy:pr oci:./multena-proxy-oci
-        else
-          echo "New tag found, using ${{ steps.autotag.outputs.new-tag }}"
-          buildah push ghcr.io/gepaplexx/multena-proxy:${{ steps.autotag.outputs.new-tag }} oci:./multena-proxy-oci
-        fi
+          buildah push ${{ steps.build-image.outputs.image-with-tag }} oci:./multena-proxy-oci
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
@@ -153,6 +147,7 @@ jobs:
       run: echo ${{ steps.docker_build.outputs.digest }}
 
     - name: Push to GitHub Container Repository
+      if: github.event_name != 'pull_request'
       id: push-to-ghcr
       uses: redhat-actions/push-to-registry@v2
       with:
