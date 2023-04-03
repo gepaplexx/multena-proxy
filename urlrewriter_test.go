@@ -1,4 +1,4 @@
-package rewrite
+package main
 
 import (
 	"testing"

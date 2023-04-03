@@ -8,9 +8,11 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: '20 8 * * 4'
 
 jobs:
-  trivy:
+  scan-code:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -19,8 +21,20 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
+          scanners: 'vuln,secret,config'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH, MEDIUM, LOW'
+          exit-code: '1'
 
-  test:
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'code'
+
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -34,17 +48,35 @@ jobs:
         run: go get .
 
       - name: Build
-        run: go build -v ./...
+        run: CGO_ENABLED=0 go build -o ./.cache/ -v ./...
+
+      - name: Copy build
+        run: cp ./.cache/multena-proxy ./multena-proxy
 
       - name: Test
         run: go test -v ./...
+
+      - uses: actions/cache@v3
+        with:
+          path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
+          key: multena-proxy-${{ github.run_id }}
+          restore-keys: multena-proxy-
+
   push:
-    needs: [test, trivy]
+    needs: [build-and-test, scan-code]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
+    - uses: actions/cache@v3
+      with:
+        path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
+        key: multena-proxy-${{ github.run_id }}
+
+    - name: move from cache
+      run: mv ./.cache/multena-proxy ./multena-proxy
+
     - name: Set image name
       run: echo "IMAGE_ID=$(echo ${{ github.repository }} | tr '[A-Z]' '[a-z]')" >> $GITHUB_ENV
 
@@ -79,47 +111,49 @@ jobs:
         flavor: |
           latest=true
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
+    - name: Buildah Action
+      id: build-image
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: ${{ env.IMAGE_NAME }}
+        tags: ${{ steps.meta.outputs.tags }}
+        containerfiles: |
+          ./build/Containerfile
 
-    - name: Set up Docker Buildx
-      id: buildx
-      uses: docker/setup-buildx-action@v2
-
-    - if: ${{ github.event_name != 'pull_request' }}
-      name: Login to Github Packages
-      uses: docker/login-action@v2
+    - name: Log in to the GitHub Container registry
+      uses: redhat-actions/podman-login@v1
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build and push
-      id: docker_build
-      uses: docker/build-push-action@v3
-      with:
-        file: ./Containerfile
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        platforms: linux/amd64
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    - name: push image to trivy
+      run: |
+          buildah push ${{ steps.build-image.outputs.image-with-tag }} oci:./multena-proxy-oci
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: 'ghcr.io/gepaplexx/multena-proxy:${{ steps.autotag.outputs.new-tag }}'
-        format: 'template'
-        template: '@/contrib/sarif.tpl'
+        input: './multena-proxy-oci'
+        format: 'sarif'
         output: 'trivy-results.sarif'
-        severity: 'CRITICAL,HIGH'
+        severity: 'CRITICAL,HIGH, MEDIUM, LOW'
+        exit-code: '1'
 
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v2
       with:
         sarif_file: 'trivy-results.sarif'
-
+        category: 'container'
 
     - name: Image digest
       run: echo ${{ steps.docker_build.outputs.digest }}
+
+    - name: Push to GitHub Container Repository
+      if: github.event_name != 'pull_request'
+      id: push-to-ghcr
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.build-image.outputs.image }}
+        tags: ${{ steps.build-image.outputs.tags }}
+        registry: ${{ env.REGISTRY }}

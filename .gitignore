@@ -1,5 +1,6 @@
 *.iml
 .env
+env.yaml
 /jsonnet/vendor
 ./jsonnet/vendor
 /jsonnet/vendor/
@@ -13,3 +14,4 @@ multena-proxy.iml
 ./.idea/
 .idea/
 .idea/*
+config.yaml
