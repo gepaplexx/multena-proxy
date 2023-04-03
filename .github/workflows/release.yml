@@ -48,7 +48,7 @@ jobs:
         run: go get .
 
       - name: Build
-        run: CGO_ENABLED=0 go build -o ./.cache/ -v ./...
+        run: go build -o ./.cache/ -v ./...
 
       - name: Copy build
         run: cp ./.cache/multena-proxy ./multena-proxy
