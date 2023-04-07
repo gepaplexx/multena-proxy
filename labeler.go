@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +60,7 @@ func GetLabelsFromProject(username string) []string {
 	var namespaces []string
 	for _, rb := range rolebindings.Items {
 		for _, user := range rb.Subjects {
-			if strings.ToLower(fmt.Sprintf("%s", user.Name)) == username {
+			if strings.ToLower(user.Name) == username {
 				namespaces = append(namespaces, rb.Namespace)
 			}
 		}

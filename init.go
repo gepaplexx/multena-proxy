@@ -61,8 +61,8 @@ func onConfigChange(e fsnotify.Event) {
 	configs := []string{"config", "users", "groups"}
 	for _, name := range configs {
 		V.SetConfigName(name) // name of config file (without extension)
-		err := V.MergeInConfig()
-		err = V.Unmarshal(C)
+		_ = V.MergeInConfig()
+		err := V.Unmarshal(C)
 		if err != nil { // Handle errors reading the config file
 			panic(fmt.Errorf("fatal error config file: %w", err))
 		}
@@ -78,14 +78,14 @@ func loadConfig(configName string) {
 	fmt.Println("Looking for config in", fmt.Sprintf("/etc/config/%s/", configName)) // REQUIRED if the config file does not have the extension in the name
 	V.AddConfigPath(fmt.Sprintf("/etc/config/%s/", configName))                      // path to look for the config file in
 	V.AddConfigPath("./configs")
-	err := V.MergeInConfig() // Find and read the config file
+	_ = V.MergeInConfig() // Find and read the config file
 	if V.GetInt("version") == 1 {
 		fmt.Println("Using v1 config")
 	} else {
 		fmt.Println("Supported versions: 1")
 		panic("Unsupported config version")
 	}
-	err = V.Unmarshal(C)
+	err := V.Unmarshal(C)
 	fmt.Printf("%+v", C)
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %w", err))
@@ -141,10 +141,6 @@ func InitDB() {
 			Logger.Panic("Error opening DB connection", zap.Error(err))
 		}
 	}
-}
-
-func CloseDB() {
-	Logger.Panic("error while serving", zap.Error(DB.Close()))
 }
 
 func InitJWKS() {

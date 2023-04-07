@@ -37,7 +37,6 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 	Logger.Debug("Healthz")
 	w.WriteHeader(http.StatusOK)
 	_, _ = fmt.Fprint(w, "Ok")
-	return
 }
 
 func reverseProxy(rw http.ResponseWriter, req *http.Request) {
