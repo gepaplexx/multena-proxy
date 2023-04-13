@@ -26,6 +26,8 @@ jobs:
         with:
           # Optional: golangci-lint command line arguments.
           args: --issues-exit-code=1 --timeout=5m
+      - name: go vet
+        run: go vet ./...
 
   scan-code:
     runs-on: ubuntu-latest
