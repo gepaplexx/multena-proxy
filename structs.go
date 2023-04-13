@@ -25,6 +25,7 @@ type Cfg struct {
 		Host         string `mapstructure:"host"`
 		Port         int    `mapstructure:"port"`
 		DbName       string `mapstructure:"db_name"`
+		Query        string `mapstructure:"query"`
 	} `mapstructure:"db"`
 	Users  map[string][]string `mapstructure:"users"`
 	Groups map[string][]string `mapstructure:"groups"`

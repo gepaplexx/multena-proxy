@@ -2,11 +2,9 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os"
 	"strings"
 )
 
@@ -20,15 +18,14 @@ func GetLabelsCM(username string, groups []string) []string {
 
 func GetLabelsFromDB(email string) []string {
 	db := DB
-	stmt := os.Getenv("LABEL_DB_QUERY")
-	n := strings.Count(stmt, "?")
+	n := strings.Count(C.Db.Query, "?")
 
 	var params []any
 	for i := 0; i < n; i++ {
 		params = append(params, email)
 	}
 
-	res, err := db.Query(stmt, params...)
+	res, err := db.Query(C.Db.Query, params...)
 	defer func(res *sql.Rows) {
 		err := res.Close()
 		if err != nil {
@@ -61,7 +58,7 @@ func GetLabelsFromProject(username string) []string {
 	var namespaces []string
 	for _, rb := range rolebindings.Items {
 		for _, user := range rb.Subjects {
-			if strings.ToLower(fmt.Sprintf("%s", user.Name)) == username {
+			if strings.ToLower(user.Name) == username {
 				namespaces = append(namespaces, rb.Namespace)
 			}
 		}
