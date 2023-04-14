@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+	"regexp"
+	"strings"
 )
 
 func main() {
@@ -70,11 +72,6 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		_, _ = fmt.Fprint(rw, "error while parsing token")
 		return
 	}
-	if "X-Plugin-Id: loki" == req.Header.Get("X-Plugin-Id") {
-		Logger.Debug("Loki request")
-		_, _ = io.WriteString(rw, "Loki request")
-		return
-	}
 
 	//if user in admin group
 	var upstreamUrl *url.URL
@@ -101,9 +98,22 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 		if req.Header.Get("X-Plugin-Id") == "loki" {
 			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURLLoki)
-			HeaderRewriter(req, labels)
 			if err != nil {
 				Logger.Error("Error parsing upstream url", zap.Error(err))
+			}
+			pattern := `(?<=query=)([^&]*)`
+			re, err := regexp.Compile(pattern)
+			if err != nil {
+				Logger.Error("Error parsing query url", zap.Error(err))
+			}
+
+			match := re.FindString(req.URL.RawQuery)
+			if match != "" {
+				query, err := enforceNamespaces(match, labels)
+				if err != nil {
+					Logger.Error("Error parsing query url", zap.Error(err))
+				}
+				req.URL.RawQuery = strings.Replace(req.URL.RawQuery, match, query, 1)
 			}
 		} else {
 			URL := req.URL.String()
