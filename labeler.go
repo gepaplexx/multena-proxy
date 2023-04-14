@@ -95,7 +95,7 @@ func enforceNamespaces(query string, namespaces []string) (string, error) {
 				namespacesFound[ns] = true
 			}
 		}
-
+		delete(namespacesFound, "~")
 		for ns := range namespacesFound {
 			if !contains(namespaces, ns) {
 				return "", errors.New("query contains disallowed namespaces")
@@ -118,7 +118,6 @@ func enforceNamespaces(query string, namespaces []string) (string, error) {
 				}
 				return fmt.Sprintf("{%s, kubernetes_namespace_name=~%q}", match[1:len(match)-1], enforcedNamespaceList)
 			}
-
 			parts[i] = selectorRegex.ReplaceAllStringFunc(part, replacer)
 		}
 	}

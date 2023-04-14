@@ -31,8 +31,8 @@ var enforceTests = []enforceTest{
 	{`{kubernetes_pod_ip="10.128.4.133"} |= "proxy" | json`, []string{"tenant1", "openshift-logging"}, `{kubernetes_pod_ip="10.128.4.133", kubernetes_namespace_name=~"tenant1|openshift-logging"} |= "proxy" | json`, nil},
 	{`{kubernetes_pod_ip="10.128.4.133"} |= "proxy" | json`, []string{"tenant1", "openshift-logging", "kube-system", "default"}, `{kubernetes_pod_ip="10.128.4.133", kubernetes_namespace_name=~"tenant1|openshift-logging|kube-system|default"} |= "proxy" | json`, nil},
 	{`{kubernetes_pod_ip="10.128.4.133"} |= "proxy" | json`, []string{"openshift-logging"}, `{kubernetes_pod_ip="10.128.4.133", kubernetes_namespace_name="openshift-logging"} |= "proxy" | json`, nil},
-	{`sum(rate({kubernetes_namespace_name=~"cert-manager|erhard-pg"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, []string{"cert-manager|erhard-pg"}, `sum(rate({kubernetes_namespace_name=~"cert-manager|erhard-pg"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, nil},
-	{`sum(rate({kubernetes_namespace_name=~"cert-manager|erhard-pg"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, []string{"cert-manager"}, `sum(rate({kubernetes_namespace_name="cert-manager"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, nil},
+	{`sum(rate({kubernetes_namespace_name=~"cert-manager|erhard-pg"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, []string{"cert-manager", "erhard-pg"}, `sum(rate({kubernetes_namespace_name=~"cert-manager|erhard-pg"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, nil},
+	{`sum(rate({kubernetes_namespace_name=~"cert-manager|erhard-pg"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, []string{"cert-manager"}, ``, errors.New("query contains disallowed namespaces")},
 	{`sum(rate({kubernetes_namespace_name=~"cert-manager|erhard-pg|default"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, []string{"cert-manager|erhard-pg"}, ``, errors.New("query contains disallowed namespaces")},
 	{`sum(rate({kubernetes_namespace_name=~"cert-manager|erhard-pg"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, []string{"tenant1"}, "", errors.New("query contains disallowed namespaces")},
 	{`sum(rate({kubernetes_namespace_name=~"cert-manager|erhard-pg"} | json | line_format "{{.status_code}}" [$__interval])) > 2`, []string{"different_namespace"}, "", errors.New("query contains disallowed namespaces")},
@@ -46,23 +46,36 @@ var enforceTests = []enforceTest{
 	{"sum by(level) (rate({kubernetes_namespace_name=~\"multena|grafana\", level=~\"error|default\"} | json | line_format `{{.message}}` | json | line_format `{{.message}}` | __error__ = `` [$__interval])) != sum by(level) (rate({kubernetes_namespace_name=\"multena\", level=~\"error|default\"} | json | line_format `{{.message}}` | json | line_format `{{.message}}` | __error__ = `` [$__interval]))", []string{"multena", "openshift-logging"}, "", errors.New("query contains disallowed namespaces")},
 }
 
-func TestEnforcer(t *testing.T) {
+func TestEnforceNamespace(t *testing.T) {
 	outf, _ := os.Create("output")
 	defer outf.Close()
 	expf, _ := os.Create("expected")
 	defer expf.Close()
-	for i, test := range enforceTests {
-		if output, err := enforceNamespaces(test.query, test.namespaces); (err == test.error) && (output != test.expected) {
-			if err != test.error {
+	for i, tt := range enforceTests {
+		t.Run(tt.query, func(t *testing.T) {
+			result, err := enforceNamespaces(tt.query, tt.namespaces)
+			//fmt.Println(tt.error, tt.expected)
+			//fmt.Println(err, result)
+			if err != nil && tt.error == nil {
 				_, _ = outf.WriteString(fmt.Sprint(i) + fmt.Sprint(err) + "\n")
-				_, _ = expf.WriteString(fmt.Sprint(i) + fmt.Sprint(test.error) + "\n")
-				t.Logf("Error %q not equal to expected %q", err, test.error)
-			} else {
-				_, _ = outf.WriteString(fmt.Sprint(i) + output + "\n")
-				_, _ = expf.WriteString(fmt.Sprint(i) + test.expected + "\n")
-				t.Errorf("Output %q not equal to expected %q", output, test.expected)
+				_, _ = expf.WriteString(fmt.Sprint(i) + fmt.Sprint(tt.error) + "\n")
+				t.Errorf("expected no error, but got: %v", err)
 			}
-
-		}
+			if err == nil && tt.error != nil {
+				_, _ = outf.WriteString(fmt.Sprint(i) + fmt.Sprint(err) + "\n")
+				_, _ = expf.WriteString(fmt.Sprint(i) + fmt.Sprint(tt.error) + "\n")
+				t.Errorf("expected error '%v', but got nil", tt.error)
+			}
+			if err != nil && tt.error != nil && err.Error() != tt.error.Error() {
+				_, _ = outf.WriteString(fmt.Sprint(i) + fmt.Sprint(err) + "\n")
+				_, _ = expf.WriteString(fmt.Sprint(i) + fmt.Sprint(tt.error) + "\n")
+				t.Errorf("expected error '%v', but got '%v'", tt.error, err)
+			}
+			if result != tt.expected {
+				_, _ = outf.WriteString(fmt.Sprint(i) + result + "\n")
+				_, _ = expf.WriteString(fmt.Sprint(i) + tt.expected + "\n")
+				t.Errorf("expected '%v', but got '%v'", tt.expected, result)
+			}
+		})
 	}
 }
