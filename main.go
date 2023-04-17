@@ -132,6 +132,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			for i, m := range lm {
 				nm, err := labels.NewMatcher(m.Type, m.Name, m.Value)
 				if err != nil {
+					rw.WriteHeader(http.StatusForbidden)
 					Logger.Error("failed parsing label matcher", zap.Error(err), zap.Int("line", 134))
 					_, _ = fmt.Fprint(rw, "failed parsing label matcher")
 					return
@@ -142,6 +143,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 			expr, err := logqlv2.ParseExpr(query)
 			if err != nil {
+				rw.WriteHeader(http.StatusForbidden)
 				Logger.Error("failed parsing LogQL expression", zap.Error(err), zap.Int("line", 144))
 				_, _ = fmt.Fprint(rw, "failed parsing LogQL expression")
 				return
@@ -152,6 +154,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 				case *logqlv2.StreamMatcherExpr:
 					err := checkItemsInList(le.Matchers(), lm)
 					if err != nil {
+						rw.WriteHeader(http.StatusForbidden)
 						Logger.Error("Unauthorized label", zap.Error(err), zap.Int("line", 154))
 						_, _ = fmt.Fprint(rw, "Unauthorized label")
 						return
@@ -172,6 +175,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			URL := req.URL.String()
 			req.URL, err = url.Parse(UrlRewriter(URL, tenantLabels, C.Proxy.TenantLabel))
 			if err != nil {
+				rw.WriteHeader(http.StatusForbidden)
 				Logger.Error("Error parsing rewritten url", zap.Error(err), zap.Int("line", 174))
 				_, _ = fmt.Fprint(rw, "Error parsing rewritten url")
 				return
@@ -180,6 +184,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			//proxy request to origin server
 			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURL)
 			if err != nil {
+				rw.WriteHeader(http.StatusForbidden)
 				Logger.Error("Error parsing upstream url", zap.Error(err))
 				_, _ = fmt.Fprint(rw, "Error parsing upstream url")
 				return
@@ -212,6 +217,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	originBody, err := io.ReadAll(originServerResponse.Body)
 	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
 		Logger.Error("Error reading origin response", zap.Error(err), zap.Int("line", 214))
 		_, _ = fmt.Fprint(rw, "Error reading origin response")
 		return
@@ -224,6 +230,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 	_, err = rw.Write(originBody)
 	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
 		Logger.Error("Error writing origin response to client", zap.Error(err), zap.Int("line", 226))
 		_, _ = fmt.Fprint(rw, "Error writing origin response to client")
 		return
@@ -233,6 +240,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
 			Logger.Error("Error closing body", zap.Error(err), zap.Int("line", 235))
 			_, _ = fmt.Fprint(rw, "Error closing body")
 			return
