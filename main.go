@@ -152,15 +152,16 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			expr.Walk(func(expr interface{}) {
 				switch le := expr.(type) {
 				case *logqlv2.StreamMatcherExpr:
-					err := checkItemsInList(le.Matchers(), lm)
-					if err != nil {
-						rw.WriteHeader(http.StatusForbidden)
-						Logger.Error("Unauthorized label", zap.Error(err), zap.Int("line", 154))
-						_, _ = fmt.Fprint(rw, "Unauthorized label")
-						return
-					}
 					if le.Matchers() == nil {
 						le.SetMatchers(lm)
+					} else {
+						err := checkItemsInList(le.Matchers(), lm)
+						if err != nil {
+							rw.WriteHeader(http.StatusForbidden)
+							Logger.Error("Unauthorized label", zap.Error(err), zap.Int("line", 154))
+							_, _ = fmt.Fprint(rw, "Unauthorized label")
+							return
+						}
 					}
 				default:
 					// Do nothing
