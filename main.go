@@ -12,7 +12,6 @@ import (
 	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
-	"strings"
 )
 
 func main() {
@@ -112,38 +111,42 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 			Logger.Debug("query", zap.String("query", query))
 
-			expr, err := logqlv2.ParseExpr(query)
-			if err != nil {
-				Logger.Error("Error parsing query url", zap.Error(err))
-			}
-
-			l := []*labels.Matcher{
-				{
+			lm := []*labels.Matcher{}
+			for _, tl := range tenantLabels {
+				lm = append(lm, &labels.Matcher{
 					Type:  labels.MatchEqual,
 					Name:  "kubernetes_namespace_name",
-					Value: strings.Join(tenantLabels, "|"),
-				},
+					Value: tl,
+				})
+			}
+			// Fix label matchers to include a non nil FastRegexMatcher for regex types.
+			for i, m := range lm {
+				nm, err := labels.NewMatcher(m.Type, m.Name, m.Value)
+				if err != nil {
+					Logger.Error("failed parsing label matcher", zap.Error(err))
+				}
+
+				lm[i] = nm
 			}
 
-			expr.Walk(func(e interface{}) {
-				switch ex := e.(type) { //nolint:gocritic
+			expr, err := logqlv2.ParseExpr(query)
+			if err != nil {
+				Logger.Error("failed parsing LogQL expression", zap.Error(err))
+			}
+
+			expr.Walk(func(expr interface{}) {
+				switch le := expr.(type) {
 				case *logqlv2.StreamMatcherExpr:
-					ex.AppendMatchers(l)
+					matchers := combineLabelMatchers(le.Matchers(), lm)
+					le.SetMatchers(matchers)
+				default:
+					// Do nothing
 				}
 			})
-
-			Logger.Debug("query", zap.String("query", expr.String()))
-
-			query, err = enforceNamespaces(query, tenantLabels)
-			if err != nil {
-				Logger.Error("Error parsing query url", zap.Error(err))
-			}
 
 			q := req.URL.Query()
 			q.Set("query", expr.String())
 			req.URL.RawQuery = q.Encode()
-			//req.URL.Path = req.URL.Path[:12] + "/application/" + req.URL.Path[13:]
-			Logger.Debug("path", zap.String("path", req.URL.Path))
 
 		} else {
 			URL := req.URL.String()
@@ -205,4 +208,25 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			Logger.Error("Error closing body", zap.Error(err))
 		}
 	}(originServerResponse.Body)
+}
+
+func combineLabelMatchers(queryMatchers, authzMatchers []*labels.Matcher) []*labels.Matcher {
+	queryMatchersMap := make(map[string]*labels.Matcher)
+	for _, qm := range queryMatchers {
+		queryMatchersMap[qm.Name] = qm
+	}
+
+	matchers := make([]*labels.Matcher, 0)
+	for _, am := range authzMatchers {
+		qm := queryMatchersMap[am.Name]
+		if qm == nil || !am.Matches(qm.Value) {
+			queryMatchersMap[am.Name] = am
+		}
+	}
+
+	for _, m := range queryMatchersMap {
+		matchers = append(matchers, m)
+	}
+
+	return matchers
 }
