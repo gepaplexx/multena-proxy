@@ -183,8 +183,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		Logger.Error("Error reading origin response", zap.Error(err))
 	}
 
-	originServerResponseDump, err := httputil.DumpResponse(originServerResponse, true)
-	Logger.Debug("Upstream Response", zap.String("response", fmt.Sprintf("%s", originServerResponseDump)))
+	//originServerResponseDump, err := httputil.DumpResponse(originServerResponse, true)
+	Logger.Debug("Upstream Response", zap.Any("header", originServerResponse.Header), zap.String("body", fmt.Sprintf("%s", originBody)))
 
 	// return response to the client
 	rw.WriteHeader(http.StatusOK)
