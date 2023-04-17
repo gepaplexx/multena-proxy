@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	logqlv2 "github.com/gepaplexx/multena-proxy/logql/v2"
 	"github.com/golang-jwt/jwt/v4"
@@ -242,7 +243,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 func checkItemsInList(queryMatchers, authzMatchers []*labels.Matcher) error {
 	for _, item := range queryMatchers {
 		if !containsMatcher(authzMatchers, item) {
-			return fmt.Errorf("Unauthoriazed label", item)
+			return errors.New("Unauthorized label")
 		}
 	}
 	return nil
