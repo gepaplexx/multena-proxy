@@ -142,6 +142,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			q := req.URL.Query()
 			q.Set("query", expr.String())
 			req.URL.RawQuery = q.Encode()
+			req.URL.Path = req.URL.Path[13:]
+			Logger.Debug("path", zap.String("path", req.URL.Path))
 
 		} else {
 			URL := req.URL.String()
@@ -162,6 +164,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	req.Host = upstreamUrl.Host
 	req.URL.Host = upstreamUrl.Host
 	req.URL.Scheme = upstreamUrl.Scheme
+
 	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
 
 	Logger.Debug("Query", zap.String("query", req.URL.String()))
