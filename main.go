@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	logqlv2 "github.com/gepaplexx/multena-proxy/logql/v2"
 	"github.com/golang-jwt/jwt/v4"
@@ -45,6 +46,7 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 }
 
 func reverseProxy(rw http.ResponseWriter, req *http.Request) {
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	dump, err := httputil.DumpRequest(req, true)
 	Logger.Debug("Request", zap.String("request", fmt.Sprintf("%s", dump)))
 	if req.Header.Get("Authorization") == "" {
