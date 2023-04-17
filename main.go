@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
 	"regexp"
@@ -43,8 +44,8 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 }
 
 func reverseProxy(rw http.ResponseWriter, req *http.Request) {
-	Logger.Info("Received request", zap.Any("request", req))
-
+	dump, err := httputil.DumpRequest(req, true)
+	Logger.Debug("Request", zap.String("request", fmt.Sprintf("%s", dump)))
 	if req.Header.Get("Authorization") == "" {
 		Logger.Warn("No Authorization header found")
 		rw.WriteHeader(http.StatusForbidden)
@@ -144,7 +145,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
 
 	//clear request URI
-	Logger.Debug("Client request", zap.Any("request", req))
+	dump, err = httputil.DumpRequest(req, true)
+	Logger.Debug("Client request", zap.String("request", fmt.Sprintf("%s", dump)))
 	req.RequestURI = ""
 	originServerResponse, err := http.DefaultClient.Do(req)
 	if err != nil {
