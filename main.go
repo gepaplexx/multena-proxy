@@ -65,7 +65,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	tokenString := req.Header.Get("Authorization")[7:]
 	keycloakToken := KeycloakToken{}
 	token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, Jwks.Keyfunc)
-	if err != nil {
+	if err != nil && !C.Dev.Enabled {
+		rw.WriteHeader(http.StatusForbidden)
 		Logger.Error("Error parsing Keycloak token", zap.Error(err), zap.Int("line", 68))
 		_, _ = fmt.Fprint(rw, "Error parsing Keycloak token")
 		return
@@ -153,6 +154,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 				switch le := expr.(type) {
 				case *logqlv2.StreamMatcherExpr:
 					if le.Matchers() == nil {
+						Logger.Debug("No label matcher found, adding default", zap.Int("line", 156))
 						le.SetMatchers(lm)
 					} else {
 						err := checkItemsInList(le.Matchers(), lm)
@@ -250,10 +252,14 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 }
 
 func checkItemsInList(queryMatchers, authzMatchers []*labels.Matcher) error {
-	for _, item := range queryMatchers {
-		if !containsMatcher(authzMatchers, item) {
-			return errors.New("Unauthorized label")
+	Logger.Debug("Checking items in list", zap.Any("queryMatchers", queryMatchers), zap.Any("authzMatchers", authzMatchers))
+	for _, qm := range queryMatchers {
+		if qm.Name == "kube_namespace_name" {
+			if !containsMatcher(authzMatchers, qm) {
+				return errors.New("Unauthorized label")
+			}
 		}
+
 	}
 	return nil
 }
