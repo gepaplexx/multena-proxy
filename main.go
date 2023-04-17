@@ -142,7 +142,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			q := req.URL.Query()
 			q.Set("query", expr.String())
 			req.URL.RawQuery = q.Encode()
-			req.URL.Path = req.URL.Path[13:]
+			req.URL.Path = req.URL.Path[:12] + "/application/" + req.URL.Path[13:]
 			Logger.Debug("path", zap.String("path", req.URL.Path))
 
 		} else {
