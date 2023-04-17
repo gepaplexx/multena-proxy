@@ -101,7 +101,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				Logger.Error("Error parsing upstream url", zap.Error(err))
 			}
-			pattern := `(?<=query=)([^&]*)`
+			pattern := `query=([^&]*)`
 			re, err := regexp.Compile(pattern)
 			if err != nil {
 				Logger.Error("Error parsing query url", zap.Error(err))
@@ -109,7 +109,14 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 			match := re.FindString(req.URL.RawQuery)
 			if match != "" {
-				query, err := enforceNamespaces(match, labels)
+				Logger.Debug("match", zap.String("match", match))
+				decoded, err := url.QueryUnescape(match)
+				if err != nil {
+					Logger.Error("Error parsing query url", zap.Error(err))
+				}
+				Logger.Debug("decoded", zap.String("decoded", decoded))
+				query, err := enforceNamespaces(decoded, labels)
+				Logger.Debug("query", zap.String("query", query), zap.String("namespaces", strings.Join(labels, ",")))
 				if err != nil {
 					Logger.Error("Error parsing query url", zap.Error(err))
 				}
