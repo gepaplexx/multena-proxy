@@ -66,6 +66,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, Jwks.Keyfunc)
 	if err != nil {
 		Logger.Error("Error parsing Keycloak token", zap.Error(err))
+		_, _ = fmt.Fprint(rw, "Error parsing Keycloak token")
+		return
 	}
 
 	//if token invalid or expired, return 401
@@ -82,6 +84,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		upstreamUrl, err = url.Parse(C.Proxy.UpstreamBypassURL)
 		if err != nil {
 			Logger.Error("Error parsing upstream url", zap.Error(err))
+			_, _ = fmt.Fprint(rw, "Error parsing upstream url")
+			return
 		}
 	} else {
 		var tenantLabels []string
@@ -94,6 +98,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			tenantLabels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
 		default:
 			Logger.Error("No provider set")
+			_, _ = fmt.Fprint(rw, "Internal Server Error")
+			return
 		}
 
 		Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
@@ -103,6 +109,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURLLoki)
 			if err != nil {
 				Logger.Error("Error parsing upstream url", zap.Error(err))
+				_, _ = fmt.Fprint(rw, "Internal Server Error")
+				return
 			}
 			query := req.URL.Query().Get("query")
 			if query == "" {
@@ -124,6 +132,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 				nm, err := labels.NewMatcher(m.Type, m.Name, m.Value)
 				if err != nil {
 					Logger.Error("failed parsing label matcher", zap.Error(err))
+					_, _ = fmt.Fprint(rw, "failed parsing label matcher")
+					return
 				}
 
 				lm[i] = nm
@@ -132,13 +142,22 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			expr, err := logqlv2.ParseExpr(query)
 			if err != nil {
 				Logger.Error("failed parsing LogQL expression", zap.Error(err))
+				_, _ = fmt.Fprint(rw, "failed parsing LogQL expression")
+				return
 			}
 
 			expr.Walk(func(expr interface{}) {
 				switch le := expr.(type) {
 				case *logqlv2.StreamMatcherExpr:
-					matchers := combineLabelMatchers(le.Matchers(), lm)
-					le.SetMatchers(matchers)
+					err := checkItemsInList(le.Matchers(), lm)
+					if err != nil {
+						Logger.Error("Unauthorized label", zap.Error(err))
+						_, _ = fmt.Fprint(rw, "Unauthorized label")
+						return
+					}
+					if le.Matchers() == nil {
+						le.SetMatchers(lm)
+					}
 				default:
 					// Do nothing
 				}
@@ -153,12 +172,16 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			req.URL, err = url.Parse(UrlRewriter(URL, tenantLabels, C.Proxy.TenantLabel))
 			if err != nil {
 				Logger.Error("Error parsing rewritten url", zap.Error(err))
+				_, _ = fmt.Fprint(rw, "Error parsing rewritten url")
+				return
 			}
 
 			//proxy request to origin server
 			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURL)
 			if err != nil {
 				Logger.Error("Error parsing upstream url", zap.Error(err))
+				_, _ = fmt.Fprint(rw, "Error parsing upstream url")
+				return
 			}
 		}
 
@@ -189,6 +212,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	originBody, err := io.ReadAll(originServerResponse.Body)
 	if err != nil {
 		Logger.Error("Error reading origin response", zap.Error(err))
+		_, _ = fmt.Fprint(rw, "Error reading origin response")
+		return
 	}
 
 	//originServerResponseDump, err := httputil.DumpResponse(originServerResponse, true)
@@ -199,6 +224,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	_, err = rw.Write(originBody)
 	if err != nil {
 		Logger.Error("Error writing origin response to client", zap.Error(err))
+		_, _ = fmt.Fprint(rw, "Error writing origin response to client")
+		return
 	}
 
 	Logger.Debug("Finished Client request")
@@ -206,27 +233,26 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		err := Body.Close()
 		if err != nil {
 			Logger.Error("Error closing body", zap.Error(err))
+			_, _ = fmt.Fprint(rw, "Error closing body")
+			return
 		}
 	}(originServerResponse.Body)
 }
 
-func combineLabelMatchers(queryMatchers, authzMatchers []*labels.Matcher) []*labels.Matcher {
-	queryMatchersMap := make(map[string]*labels.Matcher)
-	for _, qm := range queryMatchers {
-		queryMatchersMap[qm.Name] = qm
-	}
-
-	matchers := make([]*labels.Matcher, 0)
-	for _, am := range authzMatchers {
-		qm := queryMatchersMap[am.Name]
-		if qm == nil || !am.Matches(qm.Value) {
-			queryMatchersMap[am.Name] = am
+func checkItemsInList(queryMatchers, authzMatchers []*labels.Matcher) error {
+	for _, item := range queryMatchers {
+		if !containsMatcher(authzMatchers, item) {
+			return fmt.Errorf("Unauthoriazed label", item)
 		}
 	}
+	return nil
+}
 
-	for _, m := range queryMatchersMap {
-		matchers = append(matchers, m)
+func containsMatcher(list []*labels.Matcher, item *labels.Matcher) bool {
+	for _, i := range list {
+		if i.Value == item.Value {
+			return true
+		}
 	}
-
-	return matchers
+	return false
 }
