@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
+	logqlv2 "github.com/gepaplexx/multena-proxy/logql/v2"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/prometheus/prometheus/model/labels"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
-	"regexp"
 	"strings"
 )
 
@@ -82,50 +83,67 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			Logger.Error("Error parsing upstream url", zap.Error(err))
 		}
 	} else {
-		var labels []string
+		var tenantLabels []string
 		switch provider := C.Proxy.Provider; provider {
 		case "project":
-			labels = GetLabelsFromProject(keycloakToken.PreferredUsername)
+			tenantLabels = GetLabelsFromProject(keycloakToken.PreferredUsername)
 		case "mysql":
-			labels = GetLabelsFromDB(keycloakToken.Email)
+			tenantLabels = GetLabelsFromDB(keycloakToken.Email)
 		case "configmap":
-			labels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
+			tenantLabels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
 		default:
 			Logger.Error("No provider set")
 		}
 
 		Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
-		Logger.Debug("Labels", zap.Any("labels", labels))
+		Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
 
 		if req.Header.Get("X-Plugin-Id") == "loki" {
 			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURLLoki)
 			if err != nil {
 				Logger.Error("Error parsing upstream url", zap.Error(err))
 			}
-			pattern := `query=([^&]*)`
-			re, err := regexp.Compile(pattern)
+			query := req.URL.Query().Get("query")
+			if query == "" {
+				query = "{__name__=~\".+\"}"
+			}
+
+			Logger.Debug("query", zap.String("query", query))
+
+			expr, err := logqlv2.ParseExpr(query)
 			if err != nil {
 				Logger.Error("Error parsing query url", zap.Error(err))
 			}
 
-			match := re.FindString(req.URL.RawQuery)
-			if match != "" {
-				Logger.Debug("match", zap.String("match", match))
-				decoded, err := url.QueryUnescape(match)
-				if err != nil {
-					Logger.Error("Error parsing query url", zap.Error(err))
-				}
-				Logger.Debug("decoded", zap.String("decoded", decoded))
-				query, err := enforceNamespaces(decoded, labels)
-				Logger.Debug("query", zap.String("query", query), zap.String("namespaces", strings.Join(labels, ",")))
-				if err != nil {
-					Logger.Error("Error parsing query url", zap.Error(err))
-				}
-				req.URL.RawQuery = strings.Replace(req.URL.RawQuery, match, query, 1)
+			l := []*labels.Matcher{
+				{
+					Type:  labels.MatchEqual,
+					Name:  "kubernetes_namespace_name",
+					Value: strings.Join(tenantLabels, "|"),
+				},
 			}
+
+			expr.Walk(func(e interface{}) {
+				switch ex := e.(type) { //nolint:gocritic
+				case *logqlv2.StreamMatcherExpr:
+					ex.AppendMatchers(l)
+				}
+			})
+
+			Logger.Debug("query", zap.String("query", expr.String()))
+
+			query, err = enforceNamespaces(query, tenantLabels)
+			if err != nil {
+				Logger.Error("Error parsing query url", zap.Error(err))
+			}
+
+			q := req.URL.Query()
+			q.Set("query", expr.String())
+			req.URL.RawQuery = q.Encode()
+
 		} else {
 			URL := req.URL.String()
-			req.URL, err = url.Parse(UrlRewriter(URL, labels, C.Proxy.TenantLabel))
+			req.URL, err = url.Parse(UrlRewriter(URL, tenantLabels, C.Proxy.TenantLabel))
 			if err != nil {
 				Logger.Error("Error parsing rewritten url", zap.Error(err))
 			}
@@ -143,6 +161,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	req.URL.Host = upstreamUrl.Host
 	req.URL.Scheme = upstreamUrl.Scheme
 	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
+
+	Logger.Debug("Query", zap.String("query", req.URL.String()))
 
 	//clear request URI
 	dump, err = httputil.DumpRequest(req, true)
