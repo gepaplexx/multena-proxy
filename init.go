@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"flag"
@@ -39,7 +40,9 @@ func doInit() {
 	Logger.Info("Init Proxy")
 	Logger.Info("Set http client to ignore self signed certificates")
 	Logger.Info("Config ", zap.Any("cfg", C))
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true, VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		return nil
+	}}
 	InitJWKS()
 	InitKubeClient()
 	InitDB()
