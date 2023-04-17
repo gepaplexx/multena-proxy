@@ -100,7 +100,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
 		Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
 
-		if req.Header.Get("X-Plugin-Id") == "loki" {
+		if req.Header.Get("X-Plugin-Id") == "loki" || req.URL.Path[:13] == "/loki/api/v1/" {
 			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURLLoki)
 			if err != nil {
 				Logger.Error("Error parsing upstream url", zap.Error(err))
@@ -142,7 +142,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			q := req.URL.Query()
 			q.Set("query", expr.String())
 			req.URL.RawQuery = q.Encode()
-			req.URL.Path = req.URL.Path[:12] + "/application/" + req.URL.Path[13:]
+			//req.URL.Path = req.URL.Path[:12] + "/application/" + req.URL.Path[13:]
 			Logger.Debug("path", zap.String("path", req.URL.Path))
 
 		} else {
