@@ -156,7 +156,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	//clear request URI
 	dump, err = httputil.DumpRequest(req, true)
-	Logger.Debug("Client request", zap.String("request", fmt.Sprintf("%s", dump)), zap.Int("line", 200))
+	Logger.Debug("Client request", zap.String("request", fmt.Sprintf("%s", dump)), zap.Int("line", 159))
 	req.RequestURI = ""
 	originServerResponse, err := http.DefaultClient.Do(req)
 	if err != nil {
