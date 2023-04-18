@@ -186,7 +186,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	req.Host = upstreamUrl.Host
 	req.URL.Host = upstreamUrl.Host
-	req.URL.Path = upstreamUrl.Path
+	req.URL.Path = upstreamUrl.Path + req.URL.Path
 	req.URL.Scheme = upstreamUrl.Scheme
 
 	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
