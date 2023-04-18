@@ -103,6 +103,12 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		if len(tenantLabels) <= 0 {
+			rw.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(rw, "Forbidden")
+			return
+		}
+
 		Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername), zap.Int("line", 105))
 		Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels), zap.Int("line", 106))
 
@@ -149,6 +155,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
+			cool := false
+
 			expr.Walk(func(expr interface{}) {
 				switch le := expr.(type) {
 				case *logqlv2.StreamMatcherExpr:
@@ -157,6 +165,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 						rw.WriteHeader(http.StatusForbidden)
 						Logger.Error("Unauthorized labels", zap.Error(err), zap.Int("line", 155))
 						_, _ = fmt.Fprint(rw, "Unauthorized labels\n")
+						cool = true
 						return
 					}
 					Logger.Debug("matchers", zap.Any("matchers", matchers), zap.Int("line", 156))
@@ -165,6 +174,9 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 					// Do nothing
 				}
 			})
+			if cool {
+				return
+			}
 
 			q := req.URL.Query()
 			q.Set("query", expr.String())
@@ -249,11 +261,13 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 func matchNamespaceMatchers(list1, list2 []*labels.Matcher) ([]*labels.Matcher, error) {
 	// Check if any matchers in list1 are not in list2
+	namespaceLabel := false
 	for _, m1 := range list1 {
 		if m1.Name == "kubernetes_namespace_name" {
+			namespaceLabel = true
 			var found bool
 			for _, m2 := range list2 {
-				if m2.Name == "kubernetes_namespace_name" && m1.Value == m2.Value {
+				if m1.Value == m2.Value {
 					found = true
 					break
 				}
@@ -264,18 +278,8 @@ func matchNamespaceMatchers(list1, list2 []*labels.Matcher) ([]*labels.Matcher, 
 		}
 	}
 
-	// Create a new array of matching namespace labels
-	matches := make([]*labels.Matcher, 0)
-	for _, m2 := range list2 {
-		if m2.Name == "kubernetes_namespace_name" {
-			for _, m1 := range list1 {
-				if m1.Name == "kubernetes_namespace_name" && m1.Value == m2.Value {
-					matches = append(matches, m2)
-					break
-				}
-			}
-		}
+	if !namespaceLabel {
+		return append(list1, list2...), nil
 	}
-
-	return matches, nil
+	return list1, nil
 }
