@@ -12,6 +12,7 @@ import (
 	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
+	"strings"
 )
 
 func main() {
@@ -126,26 +127,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 			Logger.Debug("query", zap.String("query", query), zap.Int("line", 120))
 
-			lm := []*labels.Matcher{}
-			for _, tl := range tenantLabels {
-				lm = append(lm, &labels.Matcher{
-					Type:  labels.MatchEqual,
-					Name:  "kubernetes_namespace_name",
-					Value: tl,
-				})
-			}
 			// Fix label matchers to include a non nil FastRegexMatcher for regex types.
-			for i, m := range lm {
-				nm, err := labels.NewMatcher(m.Type, m.Name, m.Value)
-				if err != nil {
-					rw.WriteHeader(http.StatusForbidden)
-					Logger.Error("failed parsing label matcher", zap.Error(err), zap.Int("line", 134))
-					_, _ = fmt.Fprint(rw, "failed parsing label matcher\n")
-					return
-				}
-
-				lm[i] = nm
-			}
 
 			expr, err := logqlv2.ParseExpr(query)
 			if err != nil {
@@ -160,7 +142,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			expr.Walk(func(expr interface{}) {
 				switch le := expr.(type) {
 				case *logqlv2.StreamMatcherExpr:
-					matchers, err := matchNamespaceMatchers(le.Matchers(), lm)
+					matchers, err := matchNamespaceMatchers(le.Matchers(), tenantLabels)
 					if err != nil {
 						rw.WriteHeader(http.StatusForbidden)
 						Logger.Error("Unauthorized labels", zap.Error(err), zap.Int("line", 155))
@@ -259,27 +241,43 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}(originServerResponse.Body)
 }
 
-func matchNamespaceMatchers(list1, list2 []*labels.Matcher) ([]*labels.Matcher, error) {
+func matchNamespaceMatchers(qm []*labels.Matcher, tl []string) ([]*labels.Matcher, error) {
 	// Check if any matchers in list1 are not in list2
-	namespaceLabel := false
-	for _, m1 := range list1 {
+	foundNamespace := false
+	for _, m1 := range qm {
 		if m1.Name == "kubernetes_namespace_name" {
-			namespaceLabel = true
-			var found bool
-			for _, m2 := range list2 {
-				if m1.Value == m2.Value {
-					found = true
-					break
-				}
+			foundNamespace = true
+			vs := strings.Split(m1.Value, "|")
+			if !allStringsInList(vs, tl) {
+				return nil, fmt.Errorf("Unauthorized labels")
 			}
-			if !found {
-				return nil, fmt.Errorf("Namespace matcher %s not found in list2", m1.Value)
-			}
+			Logger.Debug("values", zap.String("values", m1.Value), zap.Int("line", 247))
 		}
 	}
-
-	if !namespaceLabel {
-		return append(list1, list2...), nil
+	if !foundNamespace {
+		matchType := labels.MatchEqual
+		if len(tl) > 1 {
+			matchType = labels.MatchRegexp
+		}
+		qm = append(qm, &labels.Matcher{Type: matchType, Name: "kubernetes_namespace_name", Value: strings.Join(tl, "|")})
 	}
-	return list1, nil
+
+	return qm, nil
+
+}
+
+func allStringsInList(list1, list2 []string) bool {
+	for _, str1 := range list1 {
+		found := false
+		for _, str2 := range list2 {
+			if str1 == str2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
