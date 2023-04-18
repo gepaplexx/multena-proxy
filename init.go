@@ -30,6 +30,9 @@ var (
 func init() {
 	InitConfig()
 	InitLogging()
+}
+
+func doInit() {
 	Logger.Info("-------Init Proxy-------")
 	Logger.Info("Set http client to ignore self signed certificates")
 	Logger.Info("Config ", zap.Any("cfg", C))
@@ -37,6 +40,7 @@ func init() {
 		return nil
 	}}
 	InitJWKS()
+
 	if C.Db.Enabled {
 		InitDB()
 	}

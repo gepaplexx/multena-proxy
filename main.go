@@ -12,6 +12,7 @@ import (
 )
 
 func main() {
+	doInit()
 	defer func(Logger *zap.Logger) {
 		err := Logger.Sync()
 
