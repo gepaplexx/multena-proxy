@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"errors"
 	"fmt"
 	logqlv2 "github.com/gepaplexx/multena-proxy/logql/v2"
 	"github.com/golang-jwt/jwt/v4"
@@ -153,18 +152,15 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			expr.Walk(func(expr interface{}) {
 				switch le := expr.(type) {
 				case *logqlv2.StreamMatcherExpr:
-					if le.Matchers() == nil {
-						Logger.Debug("No label matcher found, adding default", zap.Int("line", 156))
-						le.SetMatchers(lm)
-					} else {
-						err := checkItemsInList(le.Matchers(), lm)
-						if err != nil {
-							rw.WriteHeader(http.StatusForbidden)
-							Logger.Error("Unauthorized label", zap.Error(err), zap.Int("line", 154))
-							_, _ = fmt.Fprint(rw, "Unauthorized label")
-							return
-						}
+					matchers, err := combineLabelMatchers(le.Matchers(), lm)
+					if err != nil {
+						rw.WriteHeader(http.StatusForbidden)
+						Logger.Error("failed combining label matchers", zap.Error(err), zap.Int("line", 155))
+						_, _ = fmt.Fprint(rw, "failed combining label matchers")
+						return
 					}
+					Logger.Debug("matchers", zap.Any("matchers", matchers), zap.Int("line", 156))
+					le.SetMatchers(matchers)
 				default:
 					// Do nothing
 				}
@@ -251,22 +247,38 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}(originServerResponse.Body)
 }
 
-func checkItemsInList(queryMatchers, authzMatchers []*labels.Matcher) error {
-	Logger.Debug("Checking items in list", zap.Any("queryMatchers", queryMatchers), zap.Any("authzMatchers", authzMatchers))
+func combineLabelMatchers(queryMatchers, authzMatchers []*labels.Matcher) ([]*labels.Matcher, error) {
+	queryMatchersMap := make(map[string]*labels.Matcher)
 	for _, qm := range queryMatchers {
-		if qm.Name == "kube_namespace_name" {
-			if !containsMatcher(authzMatchers, qm) {
-				return errors.New("Unauthorized label")
-			}
+		if isAuthorized(qm, authzMatchers) {
+			queryMatchersMap[qm.Name] = qm
+		} else {
+			return nil, fmt.Errorf("unauthorized label matcher: %s", qm.Name)
 		}
-
 	}
-	return nil
+
+	if len(queryMatchersMap) == 0 {
+		return authzMatchers, nil
+	}
+
+	matchers := make([]*labels.Matcher, 0)
+	for _, am := range authzMatchers {
+		qm := queryMatchersMap[am.Name]
+		if qm == nil || !am.Matches(qm.Value) {
+			queryMatchersMap[am.Name] = am
+		}
+	}
+
+	for _, m := range queryMatchersMap {
+		matchers = append(matchers, m)
+	}
+
+	return matchers, nil
 }
 
-func containsMatcher(list []*labels.Matcher, item *labels.Matcher) bool {
-	for _, i := range list {
-		if i.Value == item.Value {
+func isAuthorized(matcher *labels.Matcher, authzMatchers []*labels.Matcher) bool {
+	for _, am := range authzMatchers {
+		if matcher.Name == am.Name && matcher.Type == am.Type {
 			return true
 		}
 	}
