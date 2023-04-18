@@ -250,7 +250,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 func combineLabelMatchers(queryMatchers, authzMatchers []*labels.Matcher) ([]*labels.Matcher, error) {
 	queryMatchersMap := make(map[string]*labels.Matcher)
 	for _, qm := range queryMatchers {
-		if isAuthorized(qm, authzMatchers) {
+		if isAuthorized(qm, authzMatchers) || !isRequired(qm, authzMatchers) {
 			queryMatchersMap[qm.Name] = qm
 		} else {
 			return nil, fmt.Errorf("unauthorized label matcher: %s", qm.Name)
@@ -279,6 +279,15 @@ func combineLabelMatchers(queryMatchers, authzMatchers []*labels.Matcher) ([]*la
 func isAuthorized(matcher *labels.Matcher, authzMatchers []*labels.Matcher) bool {
 	for _, am := range authzMatchers {
 		if matcher.Name == am.Name && matcher.Type == am.Type {
+			return true
+		}
+	}
+	return false
+}
+
+func isRequired(matcher *labels.Matcher, authzMatchers []*labels.Matcher) bool {
+	for _, am := range authzMatchers {
+		if matcher.Name == am.Name && matcher.Type == am.Type && !am.Matches(matcher.Value) {
 			return true
 		}
 	}
