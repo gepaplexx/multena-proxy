@@ -51,14 +51,14 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	if req.Header.Get("Authorization") == "" {
 		Logger.Warn("No Authorization header found", zap.Int("line", 52))
 		rw.WriteHeader(http.StatusForbidden)
-		_, _ = fmt.Fprint(rw, "No Authorization header found")
+		_, _ = fmt.Fprint(rw, "No Authorization header found\n")
 		return
 	}
 
 	//parse jwt from request
 	if len(req.Header.Get("Authorization")) < 7 {
 		rw.WriteHeader(http.StatusForbidden)
-		_, _ = fmt.Fprint(rw, "error while parsing token")
+		_, _ = fmt.Fprint(rw, "error while parsing token\n")
 		return
 	}
 	tokenString := req.Header.Get("Authorization")[7:]
@@ -67,7 +67,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	if err != nil && !C.Dev.Enabled {
 		rw.WriteHeader(http.StatusForbidden)
 		Logger.Error("Error parsing Keycloak token", zap.Error(err), zap.Int("line", 68))
-		_, _ = fmt.Fprint(rw, "Error parsing Keycloak token")
+		_, _ = fmt.Fprint(rw, "Error parsing Keycloak token\n")
 		return
 	}
 
@@ -75,7 +75,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	if !token.Valid && !C.Dev.Enabled {
 		rw.WriteHeader(http.StatusForbidden)
 		Logger.Debug("Invalid token", zap.Any("token", token), zap.Int("line", 76))
-		_, _ = fmt.Fprint(rw, "error while parsing token")
+		_, _ = fmt.Fprint(rw, "error while parsing token\n")
 		return
 	}
 
@@ -85,7 +85,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		upstreamUrl, err = url.Parse(C.Proxy.UpstreamBypassURL)
 		if err != nil {
 			Logger.Error("Error parsing upstream url", zap.Error(err), zap.Int("line", 86))
-			_, _ = fmt.Fprint(rw, "Error parsing upstream url")
+			_, _ = fmt.Fprint(rw, "Error parsing upstream url\n")
 			return
 		}
 	} else {
@@ -99,7 +99,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			tenantLabels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
 		default:
 			Logger.Error("No provider set", zap.Int("line", 100))
-			_, _ = fmt.Fprint(rw, "Internal Server Error")
+			_, _ = fmt.Fprint(rw, "Internal Server Error\n")
 			return
 		}
 
@@ -110,7 +110,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURLLoki)
 			if err != nil {
 				Logger.Error("Error parsing upstream url", zap.Error(err), zap.Int("line", 111))
-				_, _ = fmt.Fprint(rw, "Internal Server Error")
+				_, _ = fmt.Fprint(rw, "Internal Server Error\n")
 				return
 			}
 			query := req.URL.Query().Get("query")
@@ -134,7 +134,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 				if err != nil {
 					rw.WriteHeader(http.StatusForbidden)
 					Logger.Error("failed parsing label matcher", zap.Error(err), zap.Int("line", 134))
-					_, _ = fmt.Fprint(rw, "failed parsing label matcher")
+					_, _ = fmt.Fprint(rw, "failed parsing label matcher\n")
 					return
 				}
 
@@ -145,18 +145,18 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				rw.WriteHeader(http.StatusForbidden)
 				Logger.Error("failed parsing LogQL expression", zap.Error(err), zap.Int("line", 144))
-				_, _ = fmt.Fprint(rw, "failed parsing LogQL expression")
+				_, _ = fmt.Fprint(rw, "failed parsing LogQL expression\n")
 				return
 			}
 
 			expr.Walk(func(expr interface{}) {
 				switch le := expr.(type) {
 				case *logqlv2.StreamMatcherExpr:
-					matchers, err := combineLabelMatchers(le.Matchers(), lm)
+					matchers, err := matchNamespaceMatchers(le.Matchers(), lm)
 					if err != nil {
 						rw.WriteHeader(http.StatusForbidden)
-						Logger.Error("failed combining label matchers", zap.Error(err), zap.Int("line", 155))
-						_, _ = fmt.Fprint(rw, "failed combining label matchers")
+						Logger.Error("Unauthorized labels", zap.Error(err), zap.Int("line", 155))
+						_, _ = fmt.Fprint(rw, "Unauthorized labels\n")
 						return
 					}
 					Logger.Debug("matchers", zap.Any("matchers", matchers), zap.Int("line", 156))
@@ -176,7 +176,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				rw.WriteHeader(http.StatusForbidden)
 				Logger.Error("Error parsing rewritten url", zap.Error(err), zap.Int("line", 174))
-				_, _ = fmt.Fprint(rw, "Error parsing rewritten url")
+				_, _ = fmt.Fprint(rw, "Error parsing rewritten url\n")
 				return
 			}
 
@@ -185,7 +185,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				rw.WriteHeader(http.StatusForbidden)
 				Logger.Error("Error parsing upstream url", zap.Error(err))
-				_, _ = fmt.Fprint(rw, "Error parsing upstream url")
+				_, _ = fmt.Fprint(rw, "Error parsing upstream url\n")
 				return
 			}
 		}
@@ -218,7 +218,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		Logger.Error("Error reading origin response", zap.Error(err), zap.Int("line", 214))
-		_, _ = fmt.Fprint(rw, "Error reading origin response")
+		_, _ = fmt.Fprint(rw, "Error reading origin response\n")
 		return
 	}
 
@@ -231,7 +231,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		Logger.Error("Error writing origin response to client", zap.Error(err), zap.Int("line", 226))
-		_, _ = fmt.Fprint(rw, "Error writing origin response to client")
+		_, _ = fmt.Fprint(rw, "Error writing origin response to client\n")
 		return
 	}
 
@@ -241,55 +241,41 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			Logger.Error("Error closing body", zap.Error(err), zap.Int("line", 235))
-			_, _ = fmt.Fprint(rw, "Error closing body")
+			_, _ = fmt.Fprint(rw, "Error closing body\n")
 			return
 		}
 	}(originServerResponse.Body)
 }
 
-func combineLabelMatchers(queryMatchers, authzMatchers []*labels.Matcher) ([]*labels.Matcher, error) {
-	queryMatchersMap := make(map[string]*labels.Matcher)
-	for _, qm := range queryMatchers {
-		if isAuthorized(qm, authzMatchers) || !isRequired(qm, authzMatchers) {
-			queryMatchersMap[qm.Name] = qm
-		} else {
-			return nil, fmt.Errorf("unauthorized label matcher: %s", qm.Name)
+func matchNamespaceMatchers(list1, list2 []*labels.Matcher) ([]*labels.Matcher, error) {
+	// Check if any matchers in list1 are not in list2
+	for _, m1 := range list1 {
+		if m1.Name == "kubernetes_namespace_name" {
+			var found bool
+			for _, m2 := range list2 {
+				if m2.Name == "kubernetes_namespace_name" && m1.Value == m2.Value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("Namespace matcher %s not found in list2", m1.Value)
+			}
 		}
 	}
 
-	if len(queryMatchersMap) == 0 {
-		return authzMatchers, nil
-	}
-
-	matchers := make([]*labels.Matcher, 0)
-	for _, am := range authzMatchers {
-		qm := queryMatchersMap[am.Name]
-		if qm == nil || !am.Matches(qm.Value) {
-			queryMatchersMap[am.Name] = am
+	// Create a new array of matching namespace labels
+	matches := make([]*labels.Matcher, 0)
+	for _, m2 := range list2 {
+		if m2.Name == "kubernetes_namespace_name" {
+			for _, m1 := range list1 {
+				if m1.Name == "kubernetes_namespace_name" && m1.Value == m2.Value {
+					matches = append(matches, m2)
+					break
+				}
+			}
 		}
 	}
 
-	for _, m := range queryMatchersMap {
-		matchers = append(matchers, m)
-	}
-
-	return matchers, nil
-}
-
-func isAuthorized(matcher *labels.Matcher, authzMatchers []*labels.Matcher) bool {
-	for _, am := range authzMatchers {
-		if matcher.Name == am.Name && matcher.Type == am.Type {
-			return true
-		}
-	}
-	return false
-}
-
-func isRequired(matcher *labels.Matcher, authzMatchers []*labels.Matcher) bool {
-	for _, am := range authzMatchers {
-		if matcher.Name == am.Name && matcher.Type == am.Type && !am.Matches(matcher.Value) {
-			return true
-		}
-	}
-	return false
+	return matches, nil
 }
