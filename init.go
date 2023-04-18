@@ -5,20 +5,14 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"github.com/MicahParks/keyfunc"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -27,26 +21,26 @@ import (
 var (
 	DB                  *sql.DB
 	Jwks                *keyfunc.JWKS
-	ClientSet           *kubernetes.Clientset
 	ServiceAccountToken string
 	Logger              *zap.Logger
 	C                   *Cfg
 	V                   *viper.Viper
 )
 
-func doInit() {
+func init() {
 	InitConfig()
 	InitLogging()
-	Logger.Info("Init Proxy")
+	Logger.Info("-------Init Proxy-------")
 	Logger.Info("Set http client to ignore self signed certificates")
 	Logger.Info("Config ", zap.Any("cfg", C))
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true, VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		return nil
 	}}
 	InitJWKS()
-	InitKubeClient()
-	InitDB()
-	Logger.Info("Init Complete")
+	if C.Db.Enabled {
+		InitDB()
+	}
+	Logger.Info("------Init Complete------")
 }
 
 func InitConfig() {
@@ -69,15 +63,14 @@ func onConfigChange(e fsnotify.Event) {
 			panic(fmt.Errorf("fatal error config file: %w", err))
 		}
 	}
-	fmt.Printf("%+v", C)
-	fmt.Println("Config file changed:", e.Name)
-
+	fmt.Printf("{\"level\":\"info\",\"config\":\"%+v/\"}", C)
+	fmt.Printf("{\"level\":\"info\",\"message\":\"Config file changed: %s/\"}", e.Name)
 }
 
 func loadConfig(configName string) {
 	V.SetConfigName(configName) // name of config file (without extension)
 	V.SetConfigType("yaml")
-	fmt.Sprintf("{\"level\":\"info\",\"message\":\"Looking for config in /etc/config/%s/\"}", configName)
+	fmt.Printf("{\"level\":\"info\",\"message\":\"Looking for config in /etc/config/%s/\"}\n", configName)
 	V.AddConfigPath(fmt.Sprintf("/etc/config/%s/", configName))
 	V.AddConfigPath("./configs")
 	err := V.MergeInConfig() // Find and read the config file
@@ -124,32 +117,6 @@ func InitLogging() *zap.Logger {
 	return Logger
 }
 
-func InitDB() {
-	if C.Db.Enabled {
-		password, err := os.ReadFile(C.Db.PasswordPath)
-		if err != nil {
-			Logger.Panic("Could not read db password", zap.Error(err))
-		}
-		cfg := mysql.Config{
-			User:                 C.Db.User,
-			Passwd:               string(password),
-			Net:                  "tcp",
-			AllowNativePasswords: true,
-			Addr:                 C.Db.Host + ":" + fmt.Sprint(C.Db.Port),
-			DBName:               C.Db.DbName,
-		}
-		// Get a database handle.
-		DB, err = sql.Open("mysql", cfg.FormatDSN())
-		if err != nil {
-			Logger.Panic("Error opening DB connection", zap.Error(err))
-		}
-	}
-}
-
-func CloseDB() {
-	Logger.Panic("error while serving", zap.Error(DB.Close()))
-}
-
 func InitJWKS() {
 	Logger.Info("Init Keycloak config")
 	jwksURL := C.Proxy.JwksCertURL
@@ -175,51 +142,24 @@ func InitJWKS() {
 	Logger.Info("Finished Keycloak config")
 }
 
-func InitKubeClient() {
-	Logger.Info("Init Kubernetes Client")
-
-	if C.Dev.Enabled {
-		Logger.Info("Init Kubernetes Client with local kubeconfig")
-		ServiceAccountToken = C.Dev.ServiceAccountToken
-
-		var kubeconfig *string
-		if home := homedir.HomeDir(); home != "" {
-			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-		} else {
-			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-		}
-		flag.Parse()
-
-		err := error(nil)
-		Config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+func InitDB() {
+	if C.Db.Enabled {
+		password, err := os.ReadFile(C.Db.PasswordPath)
 		if err != nil {
-			Logger.Panic("Error building config from kubeconfig", zap.Error(err))
+			Logger.Panic("Could not read db password", zap.Error(err))
 		}
-
-		ClientSet, err = kubernetes.NewForConfig(Config)
-		if err != nil {
-			Logger.Panic("Error init kubeconfig", zap.Error(err))
+		cfg := mysql.Config{
+			User:                 C.Db.User,
+			Passwd:               string(password),
+			Net:                  "tcp",
+			AllowNativePasswords: true,
+			Addr:                 C.Db.Host + ":" + fmt.Sprint(C.Db.Port),
+			DBName:               C.Db.DbName,
 		}
-
-	} else {
-		sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+		// Get a database handle.
+		DB, err = sql.Open("mysql", cfg.FormatDSN())
 		if err != nil {
-			Logger.Panic("Failed to read service account token", zap.Error(err))
-		}
-		ServiceAccountToken = string(sa)
-
-		Logger.Info("Init Kubernetes Client with in cluster config")
-		// creates the in-cluster config
-		config, err := rest.InClusterConfig()
-		if err != nil {
-			Logger.Panic("Error while creating inClusterConfig", zap.Error(err))
-		}
-		// creates the clientset
-		ClientSet, err = kubernetes.NewForConfig(config)
-		if err != nil {
-			Logger.Panic("Error init kubeconfig", zap.Error(err))
+			Logger.Panic("Error opening DB connection", zap.Error(err))
 		}
 	}
-	Logger.Info("Kubeconfig", zap.Any("config", ClientSet))
-	Logger.Info("Finished Kubernetes Client")
 }

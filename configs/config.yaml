@@ -1,0 +1,18 @@
+version: 2
+dev:
+  enabled: true
+  service_account_token: "*****"
+
+proxy:
+  log_level: DEBUG
+  provider: configmap
+  upstream_url: "http://localhost:3000"
+  upstream_url_loki: "http://localhost:9095/lol/"
+  upstream_bypass_url: "http://localhost:9095"
+  jwks_cert_url: "https://localhost:8080/auth/realms/internal/protocol/openid-connect/certs"
+  tenant_label: namespace
+  admin_group: Gepaplexx
+  port: 8080
+
+db:
+  enabled: false

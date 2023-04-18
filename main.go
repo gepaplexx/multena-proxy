@@ -2,26 +2,22 @@ package main
 
 import (
 	"fmt"
-	logqlv2 "github.com/gepaplexx/multena-proxy/logql/v2"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/prometheus/prometheus/model/labels"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
-	"strings"
 )
 
 func main() {
-	doInit()
 	defer func(Logger *zap.Logger) {
 		err := Logger.Sync()
 
 		if err != nil {
-			fmt.Println("Error syncing logger", err)
-			panic(err)
+			fmt.Printf("{\"level\":\"error\",\"error\":\"%s/\"}", err)
+			return
 		}
 	}(Logger)
 
@@ -31,7 +27,7 @@ func main() {
 	mux.Handle("/healthz", http.HandlerFunc(healthz))
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
 	mux.Handle("/", http.HandlerFunc(reverseProxy))
-	err := http.ListenAndServe(fmt.Sprintf(":%d", C.Proxy.Port), mux)
+	err := http.ListenAndServe(fmt.Sprintf("localhost:%d", C.Proxy.Port), mux)
 	if err != nil {
 		Logger.Panic("Error while serving", zap.Error(err))
 	}
@@ -90,8 +86,6 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	} else {
 		var tenantLabels []string
 		switch provider := C.Proxy.Provider; provider {
-		case "project":
-			tenantLabels = GetLabelsFromProject(keycloakToken.PreferredUsername)
 		case "mysql":
 			tenantLabels = GetLabelsFromDB(keycloakToken.Email)
 		case "configmap":
@@ -119,50 +113,17 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 			query := req.URL.Query().Get("query")
-			if query == "" {
-				query = "{__name__=~\".+\"}"
-			}
-
-			Logger.Debug("query", zap.String("query", query), zap.Int("line", 120))
-
-			// Fix label matchers to include a non nil FastRegexMatcher for regex types.
-
-			expr, err := logqlv2.ParseExpr(query)
+			query, err = logqlEnforcer(query, tenantLabels)
 			if err != nil {
 				rw.WriteHeader(http.StatusForbidden)
-				Logger.Error("failed parsing LogQL expression", zap.Error(err), zap.Int("line", 144))
-				_, _ = fmt.Fprint(rw, "failed parsing LogQL expression\n")
+				Logger.Error("Error parsing rewritten query", zap.Error(err), zap.Int("line", 118))
+				_, _ = fmt.Fprint(rw, err)
 				return
 			}
+			req.URL.Query().Set("query", query)
 
-			cool := false
-
-			expr.Walk(func(expr interface{}) {
-				switch le := expr.(type) {
-				case *logqlv2.StreamMatcherExpr:
-					matchers, err := matchNamespaceMatchers(le.Matchers(), tenantLabels)
-					if err != nil {
-						rw.WriteHeader(http.StatusForbidden)
-						Logger.Error("Unauthorized labels", zap.Error(err), zap.Int("line", 155))
-						_, _ = fmt.Fprint(rw, "Unauthorized labels\n")
-						cool = true
-						return
-					}
-					Logger.Debug("matchers", zap.Any("matchers", matchers), zap.Int("line", 156))
-					le.SetMatchers(matchers)
-				default:
-					// Do nothing
-				}
-			})
-			if cool {
-				return
-			}
-
-			q := req.URL.Query()
-			q.Set("query", expr.String())
-			req.URL.RawQuery = q.Encode()
-
-		} else {
+		}
+		if req.Header.Get("X-Plugin-Id") == "thanos" {
 			URL := req.URL.String()
 			req.URL, err = url.Parse(UrlRewriter(URL, tenantLabels, C.Proxy.TenantLabel))
 			if err != nil {
@@ -186,7 +147,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	req.Host = upstreamUrl.Host
 	req.URL.Host = upstreamUrl.Host
-	req.URL.Path = upstreamUrl.Path
+	req.URL.Path = upstreamUrl.Path + req.URL.Path
 	req.URL.Scheme = upstreamUrl.Scheme
 
 	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
@@ -215,7 +176,6 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	//originServerResponseDump, err := httputil.DumpResponse(originServerResponse, true)
 	Logger.Debug("Upstream Response", zap.Any("header", originServerResponse.Header), zap.String("body", fmt.Sprintf("%s", originBody)), zap.Int("line", 220))
 
 	// return response to the client
@@ -238,45 +198,4 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}(originServerResponse.Body)
-}
-
-func matchNamespaceMatchers(qm []*labels.Matcher, tl []string) ([]*labels.Matcher, error) {
-	// Check if any matchers in list1 are not in list2
-	foundNamespace := false
-	for _, m1 := range qm {
-		if m1.Name == "kubernetes_namespace_name" {
-			foundNamespace = true
-			vs := strings.Split(m1.Value, "|")
-			if !allStringsInList(vs, tl) {
-				return nil, fmt.Errorf("Unauthorized labels")
-			}
-			Logger.Debug("values", zap.String("values", m1.Value), zap.Int("line", 247))
-		}
-	}
-	if !foundNamespace {
-		matchType := labels.MatchEqual
-		if len(tl) > 1 {
-			matchType = labels.MatchRegexp
-		}
-		qm = append(qm, &labels.Matcher{Type: matchType, Name: "kubernetes_namespace_name", Value: strings.Join(tl, "|")})
-	}
-
-	return qm, nil
-
-}
-
-func allStringsInList(list1, list2 []string) bool {
-	for _, str1 := range list1 {
-		found := false
-		for _, str2 := range list2 {
-			if str1 == str2 {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
 }
