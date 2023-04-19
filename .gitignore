@@ -16,3 +16,5 @@ multena-proxy.iml
 .idea/*
 ./configs/groups.yaml
 ./configs/users.yaml
+./configs/config.yaml
+./configs

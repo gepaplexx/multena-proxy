@@ -36,11 +36,15 @@ func doInit() {
 	Logger.Info("-------Init Proxy-------")
 	Logger.Info("Set http client to ignore self signed certificates")
 	Logger.Info("Config ", zap.Any("cfg", C))
-	sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
-	if err != nil {
-		Logger.Panic("Failed to read service account token", zap.Error(err))
+	ServiceAccountToken = C.Dev.ServiceAccountToken
+	if !C.Dev.Enabled {
+		sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+		if err != nil {
+			Logger.Panic("Error while reading service account token", zap.Error(err))
+		}
+		ServiceAccountToken = string(sa)
 	}
-	ServiceAccountToken = string(sa)
+
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true, VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		return nil
 	}}

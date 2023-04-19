@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	logqlv2 "github.com/gepaplexx/multena-proxy/logql/v2"
+	logqlv2 "github.com/observatorium/api/logql/v2"
 	"github.com/prometheus/prometheus/model/labels"
 	"go.uber.org/zap"
 	"strings"
