@@ -17,15 +17,14 @@ func GetLabelsCM(username string, groups []string) []string {
 
 func GetLabelsFromDB(email string) []string {
 	db := DB
-	stmt := os.Getenv("LABEL_DB_QUERY")
-	n := strings.Count(stmt, "?")
+	n := strings.Count(C.Db.Query, "?")
 
 	var params []any
 	for i := 0; i < n; i++ {
 		params = append(params, email)
 	}
 
-	res, err := db.Query(stmt, params...)
+	res, err := db.Query(C.Db.Query, params...)
 	defer func(res *sql.Rows) {
 		err := res.Close()
 		if err != nil {
