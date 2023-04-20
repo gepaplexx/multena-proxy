@@ -1,6 +1,6 @@
 package main
 
-import "github.com/golang-jwt/jwt/v4"
+import "github.com/golang-jwt/jwt/v5"
 
 type Cfg struct {
 	Version int `mapstructure:"version"`

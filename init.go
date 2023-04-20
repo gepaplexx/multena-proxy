@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/MicahParks/keyfunc"
+	"github.com/MicahParks/keyfunc/v2"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
