@@ -71,6 +71,9 @@ func onConfigChange(e fsnotify.Event) {
 	for _, name := range configs {
 		V.SetConfigName(name) // name of config file (without extension)
 		err := V.MergeInConfig()
+		if err != nil { // Handle errors reading the config file
+			panic(fmt.Errorf("fatal error config file: %w", err))
+		}
 		err = V.Unmarshal(C)
 		if err != nil { // Handle errors reading the config file
 			panic(fmt.Errorf("fatal error config file: %w", err))
@@ -87,6 +90,9 @@ func loadConfig(configName string) {
 	V.AddConfigPath(fmt.Sprintf("/etc/config/%s/", configName))
 	V.AddConfigPath("./configs")
 	err := V.MergeInConfig() // Find and read the config file
+	if err != nil {          // Handle errors reading the config file
+		panic(fmt.Errorf("fatal error config file: %w", err))
+	}
 	if V.GetInt("version") == 2 {
 		fmt.Println("{\"level\":\"info\",\"message\":\"Using v2 config\"}")
 	} else {

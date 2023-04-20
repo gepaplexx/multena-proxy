@@ -42,7 +42,10 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 
 func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	dump, err := httputil.DumpRequest(req, true)
-	Logger.Debug("Request", zap.String("request", fmt.Sprintf("%s", dump)), zap.Int("line", 50))
+	if err != nil {
+		Logger.Error("Error while dumping request", zap.Error(err))
+	}
+	Logger.Debug("Request", zap.String("request", string(dump)), zap.Int("line", 50))
 	if req.Header.Get("Authorization") == "" {
 		Logger.Warn("No Authorization header found", zap.Int("line", 52))
 		rw.WriteHeader(http.StatusForbidden)
@@ -120,7 +123,9 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 				_, _ = fmt.Fprint(rw, err)
 				return
 			}
-			req.URL.Query().Set("query", query)
+			values := req.URL.Query()
+			values.Set("query", query)
+			req.URL.RawQuery = values.Encode()
 
 		}
 		if req.Header.Get("X-Plugin-Id") == "thanos" {
@@ -156,7 +161,10 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	//clear request URI
 	dump, err = httputil.DumpRequest(req, true)
-	Logger.Debug("Client request", zap.String("request", fmt.Sprintf("%s", dump)), zap.Int("line", 159))
+	if err != nil {
+		Logger.Error("Error while dumping request", zap.Error(err))
+	}
+	Logger.Debug("Client request", zap.String("request", string(dump)), zap.Int("line", 159))
 	req.RequestURI = ""
 	originServerResponse, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -176,7 +184,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	Logger.Debug("Upstream Response", zap.Any("header", originServerResponse.Header), zap.String("body", fmt.Sprintf("%s", originBody)), zap.Int("line", 220))
+	Logger.Debug("Upstream Response", zap.Any("header", originServerResponse.Header), zap.String("body", string(originBody)), zap.Int("line", 220))
 
 	// return response to the client
 	rw.WriteHeader(http.StatusOK)
