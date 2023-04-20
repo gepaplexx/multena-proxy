@@ -49,11 +49,12 @@ func matchNamespaceMatchers(qm []*labels.Matcher, tl []string) ([]*labels.Matche
 			foundNamespace = true
 			vs := strings.Split(m1.Value, "|")
 			if len(vs) > 1 {
-				return nil, fmt.Errorf("temporary not supported")
+				return nil, fmt.Errorf("temporary not supported, please use only one namespace")
 
 			}
-			if !allStringsInList(vs, tl) {
-				return nil, fmt.Errorf("unauthorized labels")
+			allowed, label := allStringsInList(vs, tl)
+			if !allowed {
+				return nil, fmt.Errorf("unauthorized labels %s", label)
 			}
 			//Logger.Debug("values", zap.String("values", m1.Value), zap.Int("line", 247))
 		}
@@ -61,7 +62,8 @@ func matchNamespaceMatchers(qm []*labels.Matcher, tl []string) ([]*labels.Matche
 	if !foundNamespace {
 		matchType := labels.MatchEqual
 		if len(tl) > 1 {
-			matchType = labels.MatchRegexp
+			return nil, fmt.Errorf("temporary not supported, please use only one namespace")
+			//matchType = labels.MatchRegexp
 		}
 		qm = append(qm, &labels.Matcher{Type: matchType, Name: "kubernetes_namespace_name", Value: strings.Join(tl, "|")})
 	}
@@ -70,7 +72,7 @@ func matchNamespaceMatchers(qm []*labels.Matcher, tl []string) ([]*labels.Matche
 
 }
 
-func allStringsInList(list1, list2 []string) bool {
+func allStringsInList(list1, list2 []string) (bool, string) {
 	for _, str1 := range list1 {
 		found := false
 		for _, str2 := range list2 {
@@ -80,8 +82,8 @@ func allStringsInList(list1, list2 []string) bool {
 			}
 		}
 		if !found {
-			return false
+			return false, str1
 		}
 	}
-	return true
+	return true, ""
 }
