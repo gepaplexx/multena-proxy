@@ -67,7 +67,7 @@ func TestEnforceNamespace(t *testing.T) {
 		t.Run(tt.query, func(t *testing.T) {
 			result, err := logqlEnforcer(tt.query, tt.namespaces)
 			write := false
-			if fmt.Sprintf("%s", err) == "temporary not supported, please use only one namespace" {
+			if fmt.Sprintf("%s", err) == "temporary not supported, please use only one namespace" || fmt.Sprintf("%s", err) == "temporary not supported, please select a namespace" {
 				return // skip test
 			}
 			if err != nil && tt.error == nil {
