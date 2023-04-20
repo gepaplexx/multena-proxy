@@ -98,7 +98,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 		if len(tenantLabels) <= 0 {
 			rw.WriteHeader(http.StatusForbidden)
-			_, _ = io.WriteString(rw, "Forbidden")
+			_, _ = fmt.Fprint(rw, "Forbidden\n")
 			return
 		}
 
