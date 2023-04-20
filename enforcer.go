@@ -63,7 +63,7 @@ func matchNamespaceMatchers(qm []*labels.Matcher, tl []string) ([]*labels.Matche
 		matchType := labels.MatchEqual
 		if len(tl) > 1 {
 			//return nil, fmt.Errorf("temporary not supported, please select a namespace")
-			//matchType = labels.MatchRegexp
+			matchType = labels.MatchRegexp
 		}
 		qm = append(qm, &labels.Matcher{Type: matchType, Name: "kubernetes_namespace_name", Value: strings.Join(tl, "|")})
 	}
