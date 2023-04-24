@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
+	"strings"
 )
 
 func main() {
@@ -129,16 +130,6 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 		}
 		if req.Header.Get("X-Plugin-Id") == "thanos" {
-			URL := req.URL.String()
-			req.URL, err = url.Parse(UrlRewriter(URL, tenantLabels, C.Proxy.TenantLabel))
-			if err != nil {
-				rw.WriteHeader(http.StatusForbidden)
-				Logger.Error("Error parsing rewritten url", zap.Error(err), zap.Int("line", 174))
-				_, _ = fmt.Fprint(rw, "Error parsing rewritten url\n")
-				return
-			}
-
-			//proxy request to origin server
 			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURL)
 			if err != nil {
 				rw.WriteHeader(http.StatusForbidden)
@@ -146,6 +137,9 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 				_, _ = fmt.Fprint(rw, "Error parsing upstream url\n")
 				return
 			}
+			values := req.URL.Query()
+			values.Set(C.Proxy.TenantLabel, strings.Join(tenantLabels, ","))
+			req.URL.RawQuery = values.Encode()
 		}
 
 	}
