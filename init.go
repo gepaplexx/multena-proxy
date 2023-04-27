@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -45,9 +44,7 @@ func doInit() {
 		ServiceAccountToken = string(sa)
 	}
 
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true, VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		return nil
-	}}
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	InitJWKS()
 
 	if C.Db.Enabled {
