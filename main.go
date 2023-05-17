@@ -64,7 +64,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	var upstreamUrl *url.URL
 	if ContainsIgnoreCase(keycloakToken.Groups, C.Proxy.AdminGroup) || ContainsIgnoreCase(keycloakToken.ApaGroupsOrg, C.Proxy.AdminGroup) {
-		upstreamUrl, err = url.Parse(C.Proxy.UpstreamBypassURL)
+		upstreamUrl, err = url.Parse(C.Proxy.ThanosUrl)
 		if err != nil {
 			logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
 			return
@@ -90,7 +90,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
 
 		if req.Header.Get("X-Plugin-Id") == "loki" {
-			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURLLoki)
+			upstreamUrl, err = url.Parse(C.Proxy.LokiUrl)
 			if err != nil {
 				logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
 				return
@@ -107,7 +107,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 		}
 		if req.Header.Get("X-Plugin-Id") == "thanos" {
-			upstreamUrl, err = url.Parse(C.Proxy.UpstreamURL)
+			upstreamUrl, err = url.Parse(C.Proxy.ThanosUrl)
 			if err != nil {
 				logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
 				return

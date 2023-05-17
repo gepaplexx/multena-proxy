@@ -9,15 +9,15 @@ type Cfg struct {
 		ServiceAccountToken string `mapstructure:"service_account_token"`
 	} `mapstructure:"dev"`
 	Proxy struct {
-		LogLevel          string `mapstructure:"log_level"`
-		Provider          string `mapstructure:"provider"`
-		UpstreamURL       string `mapstructure:"upstream_url"`
-		UpstreamURLLoki   string `mapstructure:"upstream_url_loki"`
-		UpstreamBypassURL string `mapstructure:"upstream_bypass_url"`
-		JwksCertURL       string `mapstructure:"jwks_cert_url"`
-		TenantLabel       string `mapstructure:"tenant_label"`
-		AdminGroup        string `mapstructure:"admin_group"`
-		Port              int    `mapstructure:"port"`
+		LogLevel     string `mapstructure:"log_level"`
+		Provider     string `mapstructure:"provider"`
+		ThanosUrl    string `mapstructure:"thanos_url"`
+		LokiUrl      string `mapstructure:"loki_url"`
+		PromLabelUrl string `mapstructure:"prom_label_url"`
+		JwksCertURL  string `mapstructure:"jwks_cert_url"`
+		TenantLabel  string `mapstructure:"tenant_label"`
+		AdminGroup   string `mapstructure:"admin_group"`
+		Port         int    `mapstructure:"port"`
 	} `mapstructure:"proxy"`
 	Db struct {
 		Enabled      bool   `mapstructure:"enabled"`
