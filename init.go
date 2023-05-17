@@ -18,6 +18,7 @@ import (
 )
 
 var (
+	Commit              string
 	DB                  *sql.DB
 	Jwks                *keyfunc.JWKS
 	ServiceAccountToken string
@@ -33,6 +34,7 @@ func init() {
 
 func doInit() {
 	Logger.Info("-------Init Proxy-------")
+	Logger.Info("Commit: ", zap.String("commit", Commit))
 	Logger.Info("Set http client to ignore self signed certificates")
 	Logger.Info("Config ", zap.Any("cfg", C))
 	ServiceAccountToken = C.Dev.ServiceAccountToken

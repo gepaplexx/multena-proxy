@@ -70,7 +70,7 @@ jobs:
         run: go get .
 
       - name: Build
-        run: go build -o . -v ./...
+        run: go build -ldflags="-X main.Commit=$(git rev-parse HEAD)" -o . -v ./...
 
       - name: Copy build
         run: mkdir ./.cache && cp ./multena-proxy ./.cache/multena-proxy
