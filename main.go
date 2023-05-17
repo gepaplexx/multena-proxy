@@ -89,6 +89,12 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
 		Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
 
+		if req.Header.Get("X-Plugin-Id") == "" {
+			logAndWriteError(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
+			return
+
+		}
+
 		if req.Header.Get("X-Plugin-Id") == "loki" {
 			upstreamUrl, err = url.Parse(C.Proxy.LokiUrl)
 			if err != nil {
