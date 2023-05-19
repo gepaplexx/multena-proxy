@@ -33,6 +33,7 @@ func main() {
 	if err != nil {
 		Logger.Panic("Error while serving", zap.Error(err))
 	}
+
 }
 
 func healthz(w http.ResponseWriter, _ *http.Request) {
@@ -140,6 +141,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	logResponse(originServerResponse)
+
 	originBody, err := io.ReadAll(originServerResponse.Body)
 	if err != nil {
 		logAndWriteError(rw, "Error reading origin response", http.StatusForbidden, err)
@@ -189,6 +192,13 @@ func logRequest(req *http.Request) {
 	Logger.Debug("Request", zap.String("request", string(dump)))
 }
 
+func logResponse(res *http.Response) {
+	dump, err := httputil.DumpResponse(res, true)
+	if err != nil {
+		Logger.Error("Error while dumping request", zap.Error(err))
+	}
+	Logger.Debug("Response", zap.String("request", string(dump)))
+}
 func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
 	keycloakToken := KeycloakToken{}
 	token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, Jwks.Keyfunc)
