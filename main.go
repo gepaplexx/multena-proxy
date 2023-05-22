@@ -114,7 +114,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 		}
 		if req.Header.Get("X-Plugin-Id") == "thanos" {
-			upstreamUrl, err = url.Parse(C.Proxy.ThanosUrl)
+			upstreamUrl, err = url.Parse(C.Proxy.PromLabelUrl)
 			if err != nil {
 				logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
 				return
