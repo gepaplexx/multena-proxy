@@ -9,7 +9,6 @@ import (
 	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
-	"strings"
 )
 
 func main() {
@@ -120,7 +119,9 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 			values := req.URL.Query()
-			values.Set(C.Proxy.TenantLabel, strings.Join(tenantLabels, ","))
+			for _, tl := range tenantLabels {
+				values.Add(C.Proxy.TenantLabel, tl)
+			}
 			req.URL.RawQuery = values.Encode()
 		}
 
