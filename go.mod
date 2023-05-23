@@ -8,7 +8,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/observatorium/api v0.1.3-0.20230522080329-6e119da03b27
-	github.com/prometheus/prometheus v0.44.0
+	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/zap v1.24.0
@@ -40,4 +40,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.43.0
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v2.5.0+incompatible
