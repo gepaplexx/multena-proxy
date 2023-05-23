@@ -20,6 +20,7 @@ func logqlEnforcer(query string, tenantLabels []string) (string, error) {
 	errMsg := error(nil)
 
 	expr.Walk(func(expr interface{}) {
+		//le defines the label expression
 		switch le := expr.(type) {
 		case *logqlv2.StreamMatcherExpr:
 			matchers, err := matchNamespaceMatchers(le.Matchers(), tenantLabels)
@@ -27,7 +28,6 @@ func logqlEnforcer(query string, tenantLabels []string) (string, error) {
 				errMsg = err
 				return
 			}
-			//Logger.Debug("matchers", zap.Any("matchers", matchers), zap.Int("line", 156))
 			le.SetMatchers(matchers)
 		default:
 			// Do nothing

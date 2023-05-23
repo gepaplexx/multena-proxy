@@ -45,7 +45,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	logRequest(req)
 	Logger.Debug("url request", zap.String("url", req.URL.String()))
 
-	if !isAuthorized(req) {
+	if !hasAuthorizationHeader(req) {
 		logAndWriteError(rw, "No Authorization header found", http.StatusForbidden, nil)
 		return
 	}
@@ -134,8 +134,9 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
 
 	logRequest(req)
-
 	req.RequestURI = ""
+	logRequest(req)
+
 	originServerResponse, err := http.DefaultClient.Do(req)
 	if err != nil {
 		logAndWriteError(rw, "Error while calling upstream", http.StatusForbidden, err)
@@ -167,7 +168,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}(originServerResponse.Body)
 }
 
-func isAuthorized(req *http.Request) bool {
+func hasAuthorizationHeader(req *http.Request) bool {
 	return req.Header.Get("Authorization") != ""
 }
 
