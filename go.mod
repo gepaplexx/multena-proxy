@@ -40,4 +40,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.43.0
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.44.0
