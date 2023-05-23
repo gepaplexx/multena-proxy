@@ -10,7 +10,7 @@ require (
 	github.com/observatorium/api v0.1.3-0.20230522080329-6e119da03b27
 	github.com/prometheus/prometheus v0.44.0
 	github.com/spf13/viper v1.15.0
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 	go.uber.org/zap v1.24.0
 )
 
