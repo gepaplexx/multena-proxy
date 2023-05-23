@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
 )
@@ -16,8 +17,8 @@ func main() {
 		err := Logger.Sync()
 
 		if err != nil {
-			fmt.Println("Error syncing logger", err)
-			panic(err)
+			fmt.Printf("{\"level\":\"error\",\"error\":\"%s/\"}", err)
+			return
 		}
 	}(Logger)
 
@@ -31,6 +32,7 @@ func main() {
 	if err != nil {
 		Logger.Panic("Error while serving", zap.Error(err))
 	}
+
 }
 
 func healthz(w http.ResponseWriter, _ *http.Request) {
@@ -40,108 +42,167 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 }
 
 func reverseProxy(rw http.ResponseWriter, req *http.Request) {
-	Logger.Info("Received request", zap.Any("request", req))
+	logRequest(req)
+	Logger.Debug("url request", zap.String("url", req.URL.String()))
 
-	if req.Header.Get("Authorization") == "" {
-		Logger.Warn("No Authorization header found")
-		rw.WriteHeader(http.StatusForbidden)
-		_, _ = fmt.Fprint(rw, "No Authorization header found")
+	if !hasAuthorizationHeader(req) {
+		logAndWriteError(rw, "No Authorization header found", http.StatusForbidden, nil)
 		return
 	}
 
-	//parse jwt from request
-	if len(req.Header.Get("Authorization")) < 7 {
-		rw.WriteHeader(http.StatusForbidden)
-		_, _ = fmt.Fprint(rw, "error while parsing token")
-		return
-	}
-	tokenString := req.Header.Get("Authorization")[7:]
-	keycloakToken := KeycloakToken{}
-	token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, Jwks.Keyfunc)
-	if err != nil {
-		Logger.Error("Error parsing Keycloak token", zap.Error(err))
-	}
-
-	//if token invalid or expired, return 401
-	if !token.Valid && !C.Dev.Enabled {
-		rw.WriteHeader(http.StatusForbidden)
-		Logger.Debug("Invalid token", zap.Any("token", token))
-		_, _ = fmt.Fprint(rw, "error while parsing token")
+	tokenString := getBearerToken(req)
+	keycloakToken, token, err := parseJwtToken(tokenString)
+	if err != nil && !C.Dev.Enabled {
+		logAndWriteError(rw, "Error parsing Keycloak token", http.StatusForbidden, err)
 		return
 	}
 
-	//if user in admin group
+	if !isValidToken(token) {
+		logAndWriteError(rw, "Invalid token", http.StatusForbidden, nil)
+		return
+	}
+
 	var upstreamUrl *url.URL
 	if ContainsIgnoreCase(keycloakToken.Groups, C.Proxy.AdminGroup) || ContainsIgnoreCase(keycloakToken.ApaGroupsOrg, C.Proxy.AdminGroup) {
-		upstreamUrl, err = url.Parse(C.Proxy.UpstreamBypassURL)
+		upstreamUrl, err = url.Parse(C.Proxy.ThanosUrl)
 		if err != nil {
-			Logger.Error("Error parsing upstream url", zap.Error(err))
+			logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
+			return
 		}
 	} else {
-		var labels []string
+		var tenantLabels []string
 		switch provider := C.Proxy.Provider; provider {
-		case "project":
-			labels = GetLabelsFromProject(keycloakToken.PreferredUsername)
 		case "mysql":
-			labels = GetLabelsFromDB(keycloakToken.Email)
+			tenantLabels = GetLabelsFromDB(keycloakToken.Email)
 		case "configmap":
-			labels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
+			tenantLabels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
 		default:
-			Logger.Error("No provider set")
+			logAndWriteError(rw, "No provider set", http.StatusForbidden, nil)
+			return
+		}
+
+		if len(tenantLabels) <= 0 {
+			logAndWriteError(rw, "No tenant labels found", http.StatusForbidden, nil)
+			return
 		}
 
 		Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
-		Logger.Debug("Labels", zap.Any("labels", labels))
+		Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
 
-		URL := req.URL.String()
-		req.URL, err = url.Parse(UrlRewriter(URL, labels, C.Proxy.TenantLabel))
-		if err != nil {
-			Logger.Error("Error parsing rewritten url", zap.Error(err))
+		if req.Header.Get("X-Plugin-Id") == "" {
+			logAndWriteError(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
+			return
+
 		}
 
-		//proxy request to origin server
-		upstreamUrl, err = url.Parse(C.Proxy.UpstreamURL)
-		if err != nil {
-			Logger.Error("Error parsing upstream url", zap.Error(err))
+		if req.Header.Get("X-Plugin-Id") == "loki" {
+			upstreamUrl, err = url.Parse(C.Proxy.LokiUrl)
+			if err != nil {
+				logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
+				return
+			}
+			query := req.URL.Query().Get("query")
+			query, err = logqlEnforcer(query, tenantLabels)
+			if err != nil {
+				logAndWriteError(rw, "Error parsing rewritten query", http.StatusForbidden, err)
+				return
+			}
+			values := req.URL.Query()
+			values.Set("query", query)
+			req.URL.RawQuery = values.Encode()
+
 		}
+		if req.Header.Get("X-Plugin-Id") == "thanos" {
+			upstreamUrl, err = url.Parse(C.Proxy.PromLabelUrl)
+			if err != nil {
+				logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
+				return
+			}
+			values := req.URL.Query()
+			for _, tl := range tenantLabels {
+				values.Add(C.Proxy.TenantLabel, tl)
+			}
+			req.URL.RawQuery = values.Encode()
+		}
+
 	}
 
 	req.Host = upstreamUrl.Host
 	req.URL.Host = upstreamUrl.Host
+	req.URL.Path = upstreamUrl.Path + req.URL.Path
 	req.URL.Scheme = upstreamUrl.Scheme
 	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
 
-	//clear request URI
-	Logger.Debug("Client request", zap.Any("request", req))
+	logRequest(req)
 	req.RequestURI = ""
+	logRequest(req)
+
 	originServerResponse, err := http.DefaultClient.Do(req)
 	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		_, _ = fmt.Fprint(rw, err)
-		if err != nil {
-			Logger.Error("Error making request to origin", zap.Error(err))
-		}
+		logAndWriteError(rw, "Error while calling upstream", http.StatusForbidden, err)
 		return
 	}
 
+	logResponse(originServerResponse)
+
 	originBody, err := io.ReadAll(originServerResponse.Body)
 	if err != nil {
-		Logger.Error("Error reading origin response", zap.Error(err))
+		logAndWriteError(rw, "Error reading origin response", http.StatusForbidden, err)
+		return
 	}
-	Logger.Debug("Upstream Response", zap.Any("response", originServerResponse), zap.Any("body", originBody))
 
 	// return response to the client
 	rw.WriteHeader(http.StatusOK)
 	_, err = rw.Write(originBody)
 	if err != nil {
-		Logger.Error("Error writing origin response to client", zap.Error(err))
+		logAndWriteError(rw, "Error writing origin response to client", http.StatusInternalServerError, err)
+		return
 	}
 
-	Logger.Debug("Finished Client request")
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			Logger.Error("Error closing body", zap.Error(err))
+			logAndWriteError(rw, "Error closing body", http.StatusInternalServerError, err)
+			return
 		}
 	}(originServerResponse.Body)
+}
+
+func hasAuthorizationHeader(req *http.Request) bool {
+	return req.Header.Get("Authorization") != ""
+}
+
+func getBearerToken(req *http.Request) string {
+	return req.Header.Get("Authorization")[7:]
+}
+
+func isValidToken(token *jwt.Token) bool {
+	return token.Valid || C.Dev.Enabled
+}
+
+func logAndWriteError(rw http.ResponseWriter, message string, statusCode int, err error) {
+	Logger.Error(message, zap.Error(err))
+	rw.WriteHeader(statusCode)
+	_, _ = fmt.Fprint(rw, message+"\n")
+}
+
+func logRequest(req *http.Request) {
+	dump, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		Logger.Error("Error while dumping request", zap.Error(err))
+	}
+	Logger.Debug("Request", zap.String("request", string(dump)))
+}
+
+func logResponse(res *http.Response) {
+	dump, err := httputil.DumpResponse(res, true)
+	if err != nil {
+		Logger.Error("Error while dumping request", zap.Error(err))
+	}
+	Logger.Debug("Response", zap.String("request", string(dump)))
+}
+func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
+	keycloakToken := KeycloakToken{}
+	token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, Jwks.Keyfunc)
+	return keycloakToken, token, err
 }

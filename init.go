@@ -4,89 +4,100 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"encoding/json"
-	"flag"
 	"fmt"
-	"github.com/MicahParks/keyfunc"
+	"github.com/MicahParks/keyfunc/v2"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 )
 
 var (
+	Commit              string
 	DB                  *sql.DB
 	Jwks                *keyfunc.JWKS
-	ClientSet           *kubernetes.Clientset
 	ServiceAccountToken string
 	Logger              *zap.Logger
 	C                   *Cfg
 	V                   *viper.Viper
 )
 
-func doInit() {
+func init() {
 	InitConfig()
 	InitLogging()
-	Logger.Info("Init Proxy")
+}
+
+func doInit() {
+	Logger.Info("-------Init Proxy-------")
+	Logger.Info("Commit: ", zap.String("commit", Commit))
 	Logger.Info("Set http client to ignore self signed certificates")
 	Logger.Info("Config ", zap.Any("cfg", C))
+	ServiceAccountToken = C.Dev.ServiceAccountToken
+	if !C.Dev.Enabled {
+		sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+		if err != nil {
+			Logger.Panic("Error while reading service account token", zap.Error(err))
+		}
+		ServiceAccountToken = string(sa)
+	}
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	InitJWKS()
-	InitKubeClient()
-	InitDB()
-	Logger.Info("Init Complete")
+
+	if C.Db.Enabled {
+		InitDB()
+	}
+	Logger.Info("------Init Complete------")
 }
 
 func InitConfig() {
 	C = &Cfg{}
 	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
 	loadConfig("config")
-	loadConfig("users")
-	loadConfig("groups")
+	loadConfig("labels")
 }
 
 func onConfigChange(e fsnotify.Event) {
 	//Todo: change log level on reload
 	C = &Cfg{}
-	configs := []string{"config", "users", "groups"}
+	configs := []string{"config", "labels"}
 	for _, name := range configs {
 		V.SetConfigName(name) // name of config file (without extension)
-		_ = V.MergeInConfig()
-		err := V.Unmarshal(C)
+		err := V.MergeInConfig()
+		if err != nil { // Handle errors reading the config file
+			panic(fmt.Errorf("fatal error config file: %w", err))
+		}
+		err = V.Unmarshal(C)
 		if err != nil { // Handle errors reading the config file
 			panic(fmt.Errorf("fatal error config file: %w", err))
 		}
 	}
-	fmt.Printf("%+v", C)
-	fmt.Println("Config file changed:", e.Name)
-
+	fmt.Printf("{\"level\":\"info\",\"config\":\"%+v/\"}", C)
+	fmt.Printf("{\"level\":\"info\",\"message\":\"Config file changed: %s/\"}", e.Name)
 }
 
 func loadConfig(configName string) {
 	V.SetConfigName(configName) // name of config file (without extension)
 	V.SetConfigType("yaml")
-	fmt.Println("Looking for config in", fmt.Sprintf("/etc/config/%s/", configName)) // REQUIRED if the config file does not have the extension in the name
-	V.AddConfigPath(fmt.Sprintf("/etc/config/%s/", configName))                      // path to look for the config file in
+	fmt.Printf("{\"level\":\"info\",\"message\":\"Looking for config in /etc/config/%s/\"}\n", configName)
+	V.AddConfigPath(fmt.Sprintf("/etc/config/%s/", configName))
 	V.AddConfigPath("./configs")
-	_ = V.MergeInConfig() // Find and read the config file
-	if V.GetInt("version") == 1 {
-		fmt.Println("Using v1 config")
+	err := V.MergeInConfig() // Find and read the config file
+	if err != nil {          // Handle errors reading the config file
+		panic(fmt.Errorf("fatal error config file: %w", err))
+	}
+	if V.GetInt("version") == 2 {
+		fmt.Println("{\"level\":\"info\",\"message\":\"Using v2 config\"}")
 	} else {
-		fmt.Println("Supported versions: 1")
+		fmt.Println("{\"level\":\"error\",\"message\":\"Unsupported config version\"}")
 		panic("Unsupported config version")
 	}
-	err := V.Unmarshal(C)
-	fmt.Printf("%+v", C)
+	err = V.Unmarshal(C)
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
@@ -118,29 +129,9 @@ func InitLogging() *zap.Logger {
 
 	Logger.Debug("logger construction succeeded")
 	Logger.Debug("Go Version", zap.String("version", runtime.Version()))
+	Logger.Debug("Go OS/Arch", zap.String("os", runtime.GOOS), zap.String("arch", runtime.GOARCH))
+	Logger.Debug("Config", zap.Any("cfg", C))
 	return Logger
-}
-
-func InitDB() {
-	if C.Db.Enabled {
-		password, err := os.ReadFile(C.Db.PasswordPath)
-		if err != nil {
-			Logger.Panic("Could not read db password", zap.Error(err))
-		}
-		cfg := mysql.Config{
-			User:                 C.Db.User,
-			Passwd:               string(password),
-			Net:                  "tcp",
-			AllowNativePasswords: true,
-			Addr:                 C.Db.Host + ":" + fmt.Sprint(C.Db.Port),
-			DBName:               C.Db.DbName,
-		}
-		// Get a database handle.
-		DB, err = sql.Open("mysql", cfg.FormatDSN())
-		if err != nil {
-			Logger.Panic("Error opening DB connection", zap.Error(err))
-		}
-	}
 }
 
 func InitJWKS() {
@@ -168,51 +159,24 @@ func InitJWKS() {
 	Logger.Info("Finished Keycloak config")
 }
 
-func InitKubeClient() {
-	Logger.Info("Init Kubernetes Client")
-
-	if C.Dev.Enabled {
-		Logger.Info("Init Kubernetes Client with local kubeconfig")
-		ServiceAccountToken = C.Dev.ServiceAccountToken
-
-		var kubeconfig *string
-		if home := homedir.HomeDir(); home != "" {
-			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-		} else {
-			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-		}
-		flag.Parse()
-
-		err := error(nil)
-		Config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+func InitDB() {
+	if C.Db.Enabled {
+		password, err := os.ReadFile(C.Db.PasswordPath)
 		if err != nil {
-			Logger.Panic("Error building config from kubeconfig", zap.Error(err))
+			Logger.Panic("Could not read db password", zap.Error(err))
 		}
-
-		ClientSet, err = kubernetes.NewForConfig(Config)
-		if err != nil {
-			Logger.Panic("Error init kubeconfig", zap.Error(err))
+		cfg := mysql.Config{
+			User:                 C.Db.User,
+			Passwd:               string(password),
+			Net:                  "tcp",
+			AllowNativePasswords: true,
+			Addr:                 C.Db.Host + ":" + fmt.Sprint(C.Db.Port),
+			DBName:               C.Db.DbName,
 		}
-
-	} else {
-		sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+		// Get a database handle.
+		DB, err = sql.Open("mysql", cfg.FormatDSN())
 		if err != nil {
-			Logger.Panic("Failed to read service account token", zap.Error(err))
-		}
-		ServiceAccountToken = string(sa)
-
-		Logger.Info("Init Kubernetes Client with in cluster config")
-		// creates the in-cluster config
-		config, err := rest.InClusterConfig()
-		if err != nil {
-			Logger.Panic("Error while creating inClusterConfig", zap.Error(err))
-		}
-		// creates the clientset
-		ClientSet, err = kubernetes.NewForConfig(config)
-		if err != nil {
-			Logger.Panic("Error init kubeconfig", zap.Error(err))
+			Logger.Panic("Error opening DB connection", zap.Error(err))
 		}
 	}
-	Logger.Info("Kubeconfig", zap.Any("config", ClientSet))
-	Logger.Info("Finished Kubernetes Client")
 }

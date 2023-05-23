@@ -3,8 +3,6 @@ package main
 import (
 	"database/sql"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
 )
 
@@ -45,24 +43,4 @@ func GetLabelsFromDB(email string) []string {
 		}
 	}
 	return labels
-}
-
-func GetLabelsFromProject(username string) []string {
-	Logger.Debug("Searching namespaces")
-	rolebindings, err := ClientSet.RbacV1().RoleBindings("").List(context.TODO(), metav1.ListOptions{
-		FieldSelector: "metadata.name=gp-dev",
-	})
-	if err != nil {
-		Logger.Error("Error while using KubeAPI", zap.Error(err))
-	}
-	var namespaces []string
-	for _, rb := range rolebindings.Items {
-		for _, user := range rb.Subjects {
-			if strings.ToLower(user.Name) == username {
-				namespaces = append(namespaces, rb.Namespace)
-			}
-		}
-	}
-	Logger.Debug("Finished Searching namespaces")
-	return namespaces
 }
