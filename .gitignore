@@ -18,3 +18,4 @@ multena-proxy.iml
 ./configs/users.yaml
 ./configs/config.yaml
 ./configs
+/configs/
