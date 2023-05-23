@@ -9,10 +9,16 @@ proxy:
   upstream_url: "http://localhost:3000"
   upstream_url_loki: "http://localhost:9095/lol/"
   upstream_bypass_url: "http://localhost:9095"
-  jwks_cert_url: "https://localhost:8080/auth/realms/internal/protocol/openid-connect/certs"
+  jwks_cert_url: "https://sso.apps.c-gepa-play.gepa.vshnmanaged.net/realms/internal/protocol/openid-connect/certs"
   tenant_label: namespace
-  admin_group: Gepaplexx
+  admin_group: !Gepaplexx
   port: 8080
 
 db:
   enabled: false
+  user: multitenant
+  password_path: "/etc/secrets/db_secret"
+  host: localhost
+  port: 3306
+  db_name: "blubb"
+  query: "SELECT * FROM users WHERE username = ?"

@@ -1,0 +1,4 @@
+groups:
+  - example_group: ["example_namespace"]
+users:
+  - example_user: [ "example_namespace" ]
