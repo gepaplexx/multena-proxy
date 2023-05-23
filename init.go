@@ -59,14 +59,13 @@ func InitConfig() {
 	C = &Cfg{}
 	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
 	loadConfig("config")
-	loadConfig("users")
-	loadConfig("groups")
+	loadConfig("labels")
 }
 
 func onConfigChange(e fsnotify.Event) {
 	//Todo: change log level on reload
 	C = &Cfg{}
-	configs := []string{"config", "users", "groups"}
+	configs := []string{"config", "labels"}
 	for _, name := range configs {
 		V.SetConfigName(name) // name of config file (without extension)
 		err := V.MergeInConfig()
