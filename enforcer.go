@@ -46,6 +46,7 @@ func logqlEnforcer(query string, tenantLabels []string) (string, error) {
 func promqlEnforcer(query string, tenantLabels []string) (string, error) {
 	expr, err := parser.ParseExpr(query)
 	if err != nil {
+		Logger.Debug("error", zap.Error(err))
 		return "", err
 	}
 	le := enforcer.NewEnforcer(true, &labels.Matcher{
@@ -55,6 +56,7 @@ func promqlEnforcer(query string, tenantLabels []string) (string, error) {
 	})
 	err = le.EnforceNode(expr)
 	if err != nil {
+		Logger.Debug("error", zap.Error(err))
 		return "", err
 	}
 	Logger.Debug("expr", zap.String("expr", expr.String()), zap.String("TL", strings.Join(tenantLabels, "|")))
