@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	logqlv2 "github.com/observatorium/api/logql/v2"
+	enforcer "github.com/prometheus-community/prom-label-proxy/injectproxy"
 	"github.com/prometheus/prometheus/model/labels"
+	"github.com/prometheus/prometheus/promql/parser"
 	"go.uber.org/zap"
 	"strings"
 )
@@ -41,6 +43,23 @@ func logqlEnforcer(query string, tenantLabels []string) (string, error) {
 	return expr.String(), nil
 }
 
+func promqlEnforcer(query string, tenantLabels []string) (string, error) {
+	expr, err := parser.ParseExpr(query)
+	if err != nil {
+		return "", err
+	}
+	le := enforcer.NewEnforcer(true, &labels.Matcher{
+		Name:  "namespace",
+		Type:  labels.MatchRegexp,
+		Value: strings.Join(tenantLabels, "|"),
+	})
+	err = le.EnforceNode(expr)
+	if err != nil {
+		return "", err
+	}
+	return expr.String(), nil
+}
+
 func matchNamespaceMatchers(qm []*labels.Matcher, tl []string) ([]*labels.Matcher, error) {
 	// Check if any matchers in list1 are not in list2
 	foundNamespace := false
@@ -69,7 +88,6 @@ func matchNamespaceMatchers(qm []*labels.Matcher, tl []string) ([]*labels.Matche
 	}
 
 	return qm, nil
-
 }
 
 func allStringsInList(list1, list2 []string) (bool, string) {

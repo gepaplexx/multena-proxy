@@ -117,15 +117,19 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		if req.Header.Get("X-Plugin-Id") == "thanos" {
-			upstreamUrl, err = url.Parse(C.Proxy.PromLabelUrl)
+			upstreamUrl, err = url.Parse(C.Proxy.ThanosUrl)
 			if err != nil {
 				logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
 				return
 			}
-			values := req.URL.Query()
-			for _, tl := range tenantLabels {
-				values.Add(C.Proxy.TenantLabel, tl)
+			query := req.URL.Query().Get("query")
+			query, err = promqlEnforcer(query, tenantLabels)
+			if err != nil {
+				logAndWriteError(rw, "Error parsing rewritten query", http.StatusForbidden, err)
+				return
 			}
+			values := req.URL.Query()
+			values.Set("query", query)
 			req.URL.RawQuery = values.Encode()
 		}
 
