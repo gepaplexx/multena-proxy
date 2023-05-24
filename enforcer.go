@@ -39,7 +39,7 @@ func logqlEnforcer(query string, tenantLabels []string) (string, error) {
 		Logger.Debug("error", zap.Error(errMsg), zap.Int("line", 164))
 		return "", errMsg
 	}
-	Logger.Debug("expr", zap.String("expr", expr.String()), zap.String("TL", strings.Join(tenantLabels, "|")), zap.Int("line", 168))
+	Logger.Debug("expr", zap.String("expr", expr.String()), zap.String("TL", strings.Join(tenantLabels, "|")))
 	return expr.String(), nil
 }
 
@@ -57,6 +57,7 @@ func promqlEnforcer(query string, tenantLabels []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	Logger.Debug("expr", zap.String("expr", expr.String()), zap.String("TL", strings.Join(tenantLabels, "|")))
 	return expr.String(), nil
 }
 
