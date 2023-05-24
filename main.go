@@ -62,9 +62,19 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if req.Header.Get("X-Plugin-Id") == "" {
+		logAndWriteError(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
+		return
+	}
+
 	var upstreamUrl *url.URL
 	if ContainsIgnoreCase(keycloakToken.Groups, C.Proxy.AdminGroup) || ContainsIgnoreCase(keycloakToken.ApaGroupsOrg, C.Proxy.AdminGroup) {
-		upstreamUrl, err = url.Parse(C.Proxy.ThanosUrl)
+		switch req.Header.Get("X-Plugin-Id") {
+		case "loki":
+			upstreamUrl, err = url.Parse(C.Proxy.LokiUrl)
+		case "thanos":
+			upstreamUrl, err = url.Parse(C.Proxy.ThanosUrl)
+		}
 		if err != nil {
 			logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
 			return
@@ -89,12 +99,6 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
 		Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
 
-		if req.Header.Get("X-Plugin-Id") == "" {
-			logAndWriteError(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
-			return
-
-		}
-
 		if req.Header.Get("X-Plugin-Id") == "loki" {
 			upstreamUrl, err = url.Parse(C.Proxy.LokiUrl)
 			if err != nil {
@@ -110,8 +114,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 			values := req.URL.Query()
 			values.Set("query", query)
 			req.URL.RawQuery = values.Encode()
-
 		}
+
 		if req.Header.Get("X-Plugin-Id") == "thanos" {
 			upstreamUrl, err = url.Parse(C.Proxy.PromLabelUrl)
 			if err != nil {
