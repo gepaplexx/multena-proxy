@@ -194,9 +194,9 @@ func logRequest(req *http.Request) {
 func logResponse(res *http.Response) {
 	dump, err := httputil.DumpResponse(res, true)
 	if err != nil {
-		Logger.Error("Error while dumping request", zap.Error(err))
+		Logger.Error("Error while dumping response", zap.Error(err))
 	}
-	Logger.Debug("Response", zap.String("request", string(dump)))
+	Logger.Debug("Response", zap.String("response", string(dump)))
 }
 func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
 	keycloakToken := KeycloakToken{}

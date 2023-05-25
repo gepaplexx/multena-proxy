@@ -25,7 +25,6 @@ var (
 	Logger              *zap.Logger
 	C                   *Cfg
 	V                   *viper.Viper
-	TL                  map[string]map[string]map[string]bool
 )
 
 func init() {
