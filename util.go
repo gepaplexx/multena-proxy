@@ -11,3 +11,11 @@ func ContainsIgnoreCase(s []string, e string) bool {
 	}
 	return false
 }
+
+func MapKeysToArray(tl map[string]bool) []string {
+	tlk := make([]string, 0, len(tl))
+	for k := range tl {
+		tlk = append(tlk, k)
+	}
+	return tlk
+}

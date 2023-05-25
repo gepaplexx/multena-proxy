@@ -6,15 +6,20 @@ import (
 	"strings"
 )
 
-func GetLabelsCM(username string, groups []string) []string {
-	labels := C.Users[username]
-	for _, group := range groups {
-		labels = append(labels, C.Groups[strings.ToLower(group)]...)
+func GetLabelsCM(username string, groups []string) map[string]bool {
+	mergedNamespaces := make(map[string]bool, len(username)+len(groups)<<2)
+	for _, ns := range C.Users[username] {
+		mergedNamespaces[ns] = true
 	}
-	return labels
+	for _, g := range groups {
+		for _, ns := range C.Groups[g] {
+			mergedNamespaces[ns] = true
+		}
+	}
+	return mergedNamespaces
 }
 
-func GetLabelsFromDB(email string) []string {
+func GetLabelsFromDB(email string) map[string]bool {
 	db := DB
 	n := strings.Count(C.Db.Query, "?")
 
@@ -33,11 +38,11 @@ func GetLabelsFromDB(email string) []string {
 	if err != nil {
 		Logger.Panic("Error while querying database", zap.Error(err))
 	}
-	var labels []string
+	var labels map[string]bool
 	for res.Next() {
 		var label string
 		err = res.Scan(&label)
-		labels = append(labels, label)
+		labels[label] = true
 		if err != nil {
 			Logger.Panic("Error scanning DB result", zap.Error(err))
 		}

@@ -5,7 +5,7 @@ proxy:
   thanos_url: https://localhost:3000
   loki_url: https://localhost:3000
   prom_label_url: https://localhost:3000
-  jwks_cert_url: https://gp-sso-service.gp-sso.svc.cluster.local:8443/realms/internal/protocol/openid-connect/certs
+  jwks_cert_url: https://sso.apps.c-gepa-play.gepa.vshnmanaged.net/realms/internal/protocol/openid-connect/certs
   tenant_label: namespace
   admin_group: gepardec-run-admins
   port: 8080
@@ -17,4 +17,5 @@ db:
   dbName: blubb
   query: "SELECT * FROM users WHERE username = ?"
 dev:
-  enabled: false
+  enabled: true
+  ServiceAccountToken: "fake"

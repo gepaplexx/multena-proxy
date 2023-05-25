@@ -25,11 +25,13 @@ var (
 	Logger              *zap.Logger
 	C                   *Cfg
 	V                   *viper.Viper
+	TL                  map[string]map[string]map[string]bool
 )
 
 func init() {
 	InitConfig()
 	InitLogging()
+	mapTL()
 }
 
 func doInit() {
@@ -45,9 +47,11 @@ func doInit() {
 		}
 		ServiceAccountToken = string(sa)
 	}
+	if !C.Dev.Enabled {
+		InitJWKS()
+	}
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	InitJWKS()
 
 	if C.Db.Enabled {
 		InitDB()
@@ -60,6 +64,25 @@ func InitConfig() {
 	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
 	loadConfig("config")
 	loadConfig("labels")
+}
+
+func mapTL() {
+	TL = make(map[string]map[string]map[string]bool)
+	TL["user"] = make(map[string]map[string]bool, len(C.Users))
+	for k, tl := range C.Users {
+		TL["user"][k] = make(map[string]bool, len(tl))
+		for _, tlk := range tl {
+			TL["user"][k][tlk] = true
+		}
+	}
+	TL["groups"] = make(map[string]map[string]bool, len(C.Groups))
+	for k, tl := range C.Groups {
+		TL["groups"][k] = make(map[string]bool, len(tl))
+		for _, tlk := range tl {
+			TL["groups"][k][tlk] = true
+		}
+	}
+	Logger.Debug("TL", zap.Any("TL", TL))
 }
 
 func onConfigChange(e fsnotify.Event) {
@@ -79,6 +102,7 @@ func onConfigChange(e fsnotify.Event) {
 	}
 	fmt.Printf("{\"level\":\"info\",\"config\":\"%+v/\"}", C)
 	fmt.Printf("{\"level\":\"info\",\"message\":\"Config file changed: %s/\"}", e.Name)
+	mapTL()
 }
 
 func loadConfig(configName string) {
