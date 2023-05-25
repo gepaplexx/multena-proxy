@@ -38,7 +38,7 @@ func GetLabelsFromDB(email string) map[string]bool {
 	if err != nil {
 		Logger.Panic("Error while querying database", zap.Error(err))
 	}
-	var labels map[string]bool
+	labels := make(map[string]bool)
 	for res.Next() {
 		var label string
 		err = res.Scan(&label)
