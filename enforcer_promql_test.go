@@ -46,9 +46,9 @@ func Test_promqlEnforcer(t *testing.T) {
 			name: "case 3",
 			args: args{
 				query:        "up",
-				tenantLabels: map[string]bool{"namespace1": true, "namespace2": true},
+				tenantLabels: map[string]bool{"namespace": true, "grrr": true},
 			},
-			want:    "up{namespace=~\"namespace1|namespace2\"}",
+			want:    "up{namespace=~\"namespace|grrr\"}",
 			wantErr: false,
 		},
 	}
