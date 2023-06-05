@@ -98,7 +98,7 @@ helm upgrade multena gepardec/gp-multena -n <grafana-namespace>
 > **_NOTE:_** The helm chart has a option to install grafana-operator-datasources which simplifies the deployment of
 > Multena. If you deploy Multena without the grafana-operator-datasources you have to configure the datasource manually.
 
-### Configuring Multena
+# Configuring Multena
 
 ## Modes
 
