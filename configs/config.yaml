@@ -8,8 +8,8 @@ proxy:
   admin_group: gepardec-run-admins
   port: 8080
   tenant_labels:
-    thanos: tenant
-    loki: tenant
+    thanos: namespace
+    loki: kubernetes_namespace_name
 db:
   user: multitenant
   password_path: "."
