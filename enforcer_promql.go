@@ -7,15 +7,17 @@ import (
 	"github.com/prometheus/prometheus/promql/parser"
 	"go.uber.org/zap"
 	"strings"
+	"time"
 )
 
 func promqlEnforcer(query string, tl map[string]bool) (string, error) {
+	currentTime := time.Now()
 	expr, err := parser.ParseExpr(query)
 	if err != nil {
 		Logger.Error("error", zap.Error(err), zap.String("info", "parsing query"))
 		return "", err
 	}
-	Logger.Info("log to collect queries", zap.String("ltquery", expr.String()))
+	Logger.Info("long term query collection", zap.String("ltqc", expr.String()), zap.Time("time", currentTime))
 
 	l, err := extractLabelsAndValues(expr)
 	if err != nil {
@@ -37,6 +39,7 @@ func promqlEnforcer(query string, tl map[string]bool) (string, error) {
 	}
 
 	Logger.Debug("expr", zap.String("expr", expr.String()), zap.String("TL", strings.Join(tenantLabels, "|")))
+	Logger.Info("long term query collection processed", zap.String("ltqcp", expr.String()), zap.Time("time", currentTime))
 	return expr.String(), nil
 }
 

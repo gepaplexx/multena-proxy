@@ -6,9 +6,11 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 	"go.uber.org/zap"
 	"strings"
+	"time"
 )
 
 func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
+	currentTime := time.Now()
 	if query == "" {
 		query = "{__name__=~\".+\"}"
 	}
@@ -17,7 +19,7 @@ func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	Logger.Info("log to collect queries", zap.String("ltquery", expr.String()))
+	Logger.Info("long term query collection", zap.String("ltqc", expr.String()), zap.Time("time", currentTime))
 
 	errMsg := error(nil)
 
@@ -40,6 +42,7 @@ func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 		return "", errMsg
 	}
 	Logger.Debug("expr", zap.String("expr", expr.String()), zap.Any("TL", tenantLabels))
+	Logger.Info("long term query collection processed", zap.String("ltqcp", expr.String()), zap.Any("tl", tenantLabels), zap.Time("time", currentTime))
 	return expr.String(), nil
 }
 
