@@ -11,7 +11,7 @@ require (
 	github.com/prometheus-community/prom-label-proxy v0.6.0
 	github.com/prometheus/prometheus v0.44.0
 	github.com/spf13/viper v1.15.0
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.24.0
 )
 
