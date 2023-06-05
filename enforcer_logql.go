@@ -48,7 +48,7 @@ func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[string]bool) ([]*labels.Matcher, error) {
 	foundNamespace := false
 	for _, match := range queryMatches {
-		if match.Name == "kubernetes_namespace_name" {
+		if match.Name == Cfg.Proxy.TenantLabels.Loki {
 			foundNamespace = true
 			queryLabels := strings.Split(match.Value, "|")
 			for _, queryLabel := range queryLabels {
@@ -67,7 +67,7 @@ func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[str
 
 		queryMatches = append(queryMatches, &labels.Matcher{
 			Type:  matchType,
-			Name:  "kubernetes_namespace_name",
+			Name:  Cfg.Proxy.TenantLabels.Loki,
 			Value: strings.Join(MapKeysToArray(tenantLabels), "|"),
 		})
 	}

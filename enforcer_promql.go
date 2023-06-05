@@ -57,7 +57,7 @@ func extractLabelsAndValues(expr parser.Expr) (map[string]string, error) {
 }
 
 func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool) ([]string, error) {
-	if _, ok := queryLabels[Cfg.Proxy.TenantLabel]; ok {
+	if _, ok := queryLabels[Cfg.Proxy.TenantLabels.Thanos]; ok {
 		ok, tenantLabels := checkLabels(queryLabels, allowedTenantLabels)
 		if !ok {
 			return nil, fmt.Errorf("user not allowed with namespace %s", tenantLabels[0])
@@ -69,7 +69,7 @@ func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string
 }
 
 func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool) (bool, []string) {
-	splitQueryLabels := strings.Split(queryLabels[Cfg.Proxy.TenantLabel], "|")
+	splitQueryLabels := strings.Split(queryLabels[Cfg.Proxy.TenantLabels.Thanos], "|")
 	for _, queryLabel := range splitQueryLabels {
 		_, ok := allowedTenantLabels[queryLabel]
 		if !ok {
@@ -88,7 +88,7 @@ func createEnforcer(tenantLabels []string) *enforcer.Enforcer {
 	}
 
 	return enforcer.NewEnforcer(true, &labels.Matcher{
-		Name:  Cfg.Proxy.TenantLabel,
+		Name:  Cfg.Proxy.TenantLabels.Thanos,
 		Type:  matchType,
 		Value: strings.Join(tenantLabels, "|"),
 	})
