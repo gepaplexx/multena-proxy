@@ -28,7 +28,7 @@ func main() {
 	mux.Handle("/healthz", http.HandlerFunc(healthz))
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
 	mux.Handle("/", http.HandlerFunc(reverseProxy))
-	err := http.ListenAndServe(fmt.Sprintf("localhost:%d", C.Proxy.Port), mux)
+	err := http.ListenAndServe(fmt.Sprintf("localhost:%d", Cfg.Proxy.Port), mux)
 	if err != nil {
 		Logger.Panic("Error while serving", zap.Error(err))
 	}
@@ -56,7 +56,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	tokenString := getBearerToken(req)
 	keycloakToken, token, err := parseJwtToken(tokenString)
-	if err != nil && !C.Dev.Enabled {
+	if err != nil && !Cfg.Dev.Enabled {
 		logAndWriteError(rw, "Error parsing Keycloak token", http.StatusForbidden, err)
 		return
 	}
@@ -72,12 +72,12 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if req.Header.Get("X-Plugin-Id") == "thanos" {
-		upstreamUrl, err = url.Parse(C.Proxy.ThanosUrl)
+		upstreamUrl, err = url.Parse(Cfg.Proxy.ThanosUrl)
 		enforceFunc = promqlEnforcer
 	}
 
 	if req.Header.Get("X-Plugin-Id") == "loki" {
-		upstreamUrl, err = url.Parse(C.Proxy.LokiUrl)
+		upstreamUrl, err = url.Parse(Cfg.Proxy.LokiUrl)
 		enforceFunc = logqlEnforcer
 	}
 	if err != nil {
@@ -89,11 +89,11 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		goto DoRequest
 	}
 
-	if C.Dev.Enabled {
-		keycloakToken.PreferredUsername = C.Dev.Username
+	if Cfg.Dev.Enabled {
+		keycloakToken.PreferredUsername = Cfg.Dev.Username
 	}
 
-	switch provider := C.Proxy.Provider; provider {
+	switch provider := Cfg.Proxy.Provider; provider {
 	case "mysql":
 		tenantLabels = GetLabelsFromDB(keycloakToken.Email)
 	case "configmap":
@@ -170,11 +170,11 @@ func getBearerToken(req *http.Request) string {
 }
 
 func isValidToken(token *jwt.Token) bool {
-	return token.Valid || C.Dev.Enabled
+	return token.Valid || Cfg.Dev.Enabled
 }
 
 func isAdminSkip(token KeycloakToken) bool {
-	return ContainsIgnoreCase(token.Groups, C.Proxy.AdminGroup) || ContainsIgnoreCase(token.ApaGroupsOrg, C.Proxy.AdminGroup)
+	return ContainsIgnoreCase(token.Groups, Cfg.Proxy.AdminGroup) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Proxy.AdminGroup)
 }
 
 func logAndWriteError(rw http.ResponseWriter, message string, statusCode int, err error) {
@@ -203,7 +203,7 @@ func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
 	token, err := jwt.ParseWithClaims(tokenString, keycloakToken, func(token *jwt.Token) (interface{}, error) {
 		return nil, fmt.Errorf("unable to verify token")
 	})
-	if !C.Dev.Enabled {
+	if !Cfg.Dev.Enabled {
 		token, err = jwt.ParseWithClaims(tokenString, &keycloakToken, Jwks.Keyfunc)
 	}
 	return keycloakToken, token, err

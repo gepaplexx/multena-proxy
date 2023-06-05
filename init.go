@@ -23,7 +23,7 @@ var (
 	Jwks                *keyfunc.JWKS
 	ServiceAccountToken string
 	Logger              *zap.Logger
-	C                   *Cfg
+	Cfg                 *Config
 	V                   *viper.Viper
 )
 
@@ -36,29 +36,29 @@ func doInit() {
 	Logger.Info("-------Init Proxy-------")
 	Logger.Info("Commit: ", zap.String("commit", Commit))
 	Logger.Info("Set http client to ignore self signed certificates")
-	Logger.Info("Config ", zap.Any("cfg", C))
-	ServiceAccountToken = C.Dev.ServiceAccountToken
-	if !C.Dev.Enabled {
+	Logger.Info("Config ", zap.Any("cfg", Cfg))
+	ServiceAccountToken = Cfg.Dev.ServiceAccountToken
+	if !Cfg.Dev.Enabled {
 		sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
 		if err != nil {
 			Logger.Panic("Error while reading service account token", zap.Error(err))
 		}
 		ServiceAccountToken = string(sa)
 	}
-	if !C.Dev.Enabled {
+	if !Cfg.Dev.Enabled {
 		InitJWKS()
 	}
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
-	if C.Db.Enabled {
+	if Cfg.Db.Enabled {
 		InitDB()
 	}
 	Logger.Info("------Init Complete------")
 }
 
 func InitConfig() {
-	C = &Cfg{}
+	Cfg = &Config{}
 	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
 	loadConfig("config")
 	loadConfig("labels")
@@ -66,7 +66,7 @@ func InitConfig() {
 
 func onConfigChange(e fsnotify.Event) {
 	//Todo: change log level on reload
-	C = &Cfg{}
+	Cfg = &Config{}
 	configs := []string{"config", "labels"}
 	for _, name := range configs {
 		V.SetConfigName(name) // name of config file (without extension)
@@ -74,12 +74,12 @@ func onConfigChange(e fsnotify.Event) {
 		if err != nil { // Handle errors reading the config file
 			panic(fmt.Errorf("fatal error config file: %w", err))
 		}
-		err = V.Unmarshal(C)
+		err = V.Unmarshal(Cfg)
 		if err != nil { // Handle errors reading the config file
 			panic(fmt.Errorf("fatal error config file: %w", err))
 		}
 	}
-	fmt.Printf("{\"level\":\"info\",\"config\":\"%+v/\"}", C)
+	fmt.Printf("{\"level\":\"info\",\"config\":\"%+v/\"}", Cfg)
 	fmt.Printf("{\"level\":\"info\",\"message\":\"Config file changed: %s/\"}", e.Name)
 }
 
@@ -99,7 +99,7 @@ func loadConfig(configName string) {
 		fmt.Println("{\"level\":\"error\",\"message\":\"Unsupported config version\"}")
 		panic("Unsupported config version")
 	}
-	err = V.Unmarshal(C)
+	err = V.Unmarshal(Cfg)
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
@@ -112,7 +112,7 @@ func loadConfig(configName string) {
 // The log level can be set to debug, info, warn, error, dpanic, panic, or fatal
 func InitLogging() *zap.Logger {
 	rawJSON := []byte(`{
-		"level": "` + strings.ToLower(C.Proxy.LogLevel) + `",
+		"level": "` + strings.ToLower(Cfg.Proxy.LogLevel) + `",
 		"encoding": "json",
 		"outputPaths": ["stdout"],
 		"errorOutputPaths": ["stdout"],
@@ -132,13 +132,13 @@ func InitLogging() *zap.Logger {
 	Logger.Debug("logger construction succeeded")
 	Logger.Debug("Go Version", zap.String("version", runtime.Version()))
 	Logger.Debug("Go OS/Arch", zap.String("os", runtime.GOOS), zap.String("arch", runtime.GOARCH))
-	Logger.Debug("Config", zap.Any("cfg", C))
+	Logger.Debug("Config", zap.Any("cfg", Cfg))
 	return Logger
 }
 
 func InitJWKS() {
 	Logger.Info("Init Keycloak config")
-	jwksURL := C.Proxy.JwksCertURL
+	jwksURL := Cfg.Proxy.JwksCertURL
 
 	options := keyfunc.Options{
 		RefreshErrorHandler: func(err error) {
@@ -162,18 +162,18 @@ func InitJWKS() {
 }
 
 func InitDB() {
-	if C.Db.Enabled {
-		password, err := os.ReadFile(C.Db.PasswordPath)
+	if Cfg.Db.Enabled {
+		password, err := os.ReadFile(Cfg.Db.PasswordPath)
 		if err != nil {
 			Logger.Panic("Could not read db password", zap.Error(err))
 		}
 		cfg := mysql.Config{
-			User:                 C.Db.User,
+			User:                 Cfg.Db.User,
 			Passwd:               string(password),
 			Net:                  "tcp",
 			AllowNativePasswords: true,
-			Addr:                 C.Db.Host + ":" + fmt.Sprint(C.Db.Port),
-			DBName:               C.Db.DbName,
+			Addr:                 Cfg.Db.Host + ":" + fmt.Sprint(Cfg.Db.Port),
+			DBName:               Cfg.Db.DbName,
 		}
 		// Get a database handle.
 		DB, err = sql.Open("mysql", cfg.FormatDSN())

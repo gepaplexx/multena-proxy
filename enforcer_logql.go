@@ -24,15 +24,14 @@ func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 	errMsg := error(nil)
 
 	expr.Walk(func(expr interface{}) {
-		//le defines the label expression
-		switch le := expr.(type) {
+		switch labelExpression := expr.(type) {
 		case *logqlv2.StreamMatcherExpr:
-			matchers, err := matchNamespaceMatchers(le.Matchers(), tenantLabels)
+			matchers, err := matchNamespaceMatchers(labelExpression.Matchers(), tenantLabels)
 			if err != nil {
 				errMsg = err
 				return
 			}
-			le.SetMatchers(matchers)
+			labelExpression.SetMatchers(matchers)
 		default:
 			// Do nothing
 		}
@@ -41,37 +40,36 @@ func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 		Logger.Debug("error", zap.Error(errMsg), zap.Int("line", 164))
 		return "", errMsg
 	}
-	Logger.Debug("expr", zap.String("expr", expr.String()), zap.Any("TL", tenantLabels))
+	Logger.Debug("expr", zap.String("expr", expr.String()), zap.Any("tl", tenantLabels))
 	Logger.Info("long term query collection processed", zap.String("ltqcp", expr.String()), zap.Any("tl", tenantLabels), zap.Time("time", currentTime))
 	return expr.String(), nil
 }
 
-func matchNamespaceMatchers(qm []*labels.Matcher, tl map[string]bool) ([]*labels.Matcher, error) {
-	// Check if any matchers in list1 are not in list2
+func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[string]bool) ([]*labels.Matcher, error) {
 	foundNamespace := false
-	for _, m1 := range qm {
-		if m1.Name == "kubernetes_namespace_name" {
+	for _, match := range queryMatches {
+		if match.Name == "kubernetes_namespace_name" {
 			foundNamespace = true
-			qls := strings.Split(m1.Value, "|")
-			for _, ql := range qls {
-				_, ok := tl[ql]
+			queryLabels := strings.Split(match.Value, "|")
+			for _, queryLabel := range queryLabels {
+				_, ok := tenantLabels[queryLabel]
 				if !ok {
-					return nil, fmt.Errorf("unauthorized namespace %s", ql)
+					return nil, fmt.Errorf("unauthorized namespace %s", queryLabel)
 				}
 			}
 		}
 	}
 	if !foundNamespace {
 		matchType := labels.MatchEqual
-		if len(tl) > 1 {
+		if len(tenantLabels) > 1 {
 			matchType = labels.MatchRegexp
 		}
 
-		qm = append(qm, &labels.Matcher{
+		queryMatches = append(queryMatches, &labels.Matcher{
 			Type:  matchType,
 			Name:  "kubernetes_namespace_name",
-			Value: strings.Join(MapKeysToArray(tl), "|"),
+			Value: strings.Join(MapKeysToArray(tenantLabels), "|"),
 		})
 	}
-	return qm, nil
+	return queryMatches, nil
 }

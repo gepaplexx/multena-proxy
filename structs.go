@@ -2,7 +2,7 @@ package main
 
 import "github.com/golang-jwt/jwt/v5"
 
-type Cfg struct {
+type Config struct {
 	Version int `mapstructure:"version"`
 	Dev     struct {
 		Enabled             bool   `mapstructure:"enabled"`

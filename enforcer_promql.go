@@ -38,7 +38,7 @@ func promqlEnforcer(query string, tl map[string]bool) (string, error) {
 		return "", err
 	}
 
-	Logger.Debug("expr", zap.String("expr", expr.String()), zap.String("TL", strings.Join(tenantLabels, "|")))
+	Logger.Debug("expr", zap.String("expr", expr.String()), zap.String("tl", strings.Join(tenantLabels, "|")))
 	Logger.Info("long term query collection processed", zap.String("ltqcp", expr.String()), zap.Time("time", currentTime))
 	return expr.String(), nil
 }
@@ -57,7 +57,7 @@ func extractLabelsAndValues(expr parser.Expr) (map[string]string, error) {
 }
 
 func enforceLabels(l map[string]string, tl map[string]bool) ([]string, error) {
-	if _, ok := l[C.Proxy.TenantLabel]; ok {
+	if _, ok := l[Cfg.Proxy.TenantLabel]; ok {
 		ok, tenantLabels := checkLabels(l, tl)
 		if !ok {
 			return nil, fmt.Errorf("user not allowed with namespace %s", tenantLabels[0])
@@ -77,14 +77,14 @@ func createEnforcer(tenantLabels []string) *enforcer.Enforcer {
 	}
 
 	return enforcer.NewEnforcer(true, &labels.Matcher{
-		Name:  C.Proxy.TenantLabel,
+		Name:  Cfg.Proxy.TenantLabel,
 		Type:  matchType,
 		Value: strings.Join(tenantLabels, "|"),
 	})
 }
 
 func checkLabels(l map[string]string, tl map[string]bool) (bool, []string) {
-	qls := strings.Split(l[C.Proxy.TenantLabel], "|")
+	qls := strings.Split(l[Cfg.Proxy.TenantLabel], "|")
 	for _, ql := range qls {
 		_, ok := tl[ql]
 		if !ok {

@@ -14,12 +14,12 @@ func GetLabelsCM(username string, groups []string) map[string]bool {
 		mergedNamespaces = make(map[string]bool, len(username))
 	}
 
-	for _, ns := range C.Users[username] {
-		mergedNamespaces[ns] = true
+	for _, namespace := range Cfg.Users[username] {
+		mergedNamespaces[namespace] = true
 	}
-	for _, g := range groups {
-		for _, ns := range C.Groups[g] {
-			mergedNamespaces[ns] = true
+	for _, group := range groups {
+		for _, namespace := range Cfg.Groups[group] {
+			mergedNamespaces[namespace] = true
 		}
 	}
 	return mergedNamespaces
@@ -27,14 +27,14 @@ func GetLabelsCM(username string, groups []string) map[string]bool {
 
 func GetLabelsFromDB(email string) map[string]bool {
 	db := DB
-	n := strings.Count(C.Db.Query, "?")
+	n := strings.Count(Cfg.Db.Query, "?")
 
 	var params []any
 	for i := 0; i < n; i++ {
 		params = append(params, email)
 	}
 
-	res, err := db.Query(C.Db.Query, params...)
+	res, err := db.Query(Cfg.Db.Query, params...)
 	defer func(res *sql.Rows) {
 		err := res.Close()
 		if err != nil {
