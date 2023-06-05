@@ -7,7 +7,13 @@ import (
 )
 
 func GetLabelsCM(username string, groups []string) map[string]bool {
-	mergedNamespaces := make(map[string]bool, len(username)+len(groups)<<2)
+	var mergedNamespaces map[string]bool
+	if len(groups) >= 1 {
+		mergedNamespaces = make(map[string]bool, len(username)+len(groups)*len(groups[0]))
+	} else {
+		mergedNamespaces = make(map[string]bool, len(username))
+	}
+
 	for _, ns := range C.Users[username] {
 		mergedNamespaces[ns] = true
 	}
