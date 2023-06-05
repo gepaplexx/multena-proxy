@@ -6,6 +6,7 @@ type Cfg struct {
 	Version int `mapstructure:"version"`
 	Dev     struct {
 		Enabled             bool   `mapstructure:"enabled"`
+		Username            string `mapstructure:"username"`
 		ServiceAccountToken string `mapstructure:"service_account_token"`
 	} `mapstructure:"dev"`
 	Proxy struct {
