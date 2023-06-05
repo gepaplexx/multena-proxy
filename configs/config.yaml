@@ -1,4 +1,3 @@
-version: 2
 proxy:
   log_level: DEBUG
   provider: configmap

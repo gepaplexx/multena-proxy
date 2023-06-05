@@ -93,12 +93,6 @@ func loadConfig(configName string) {
 	if err != nil {          // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
-	if V.GetInt("version") == 2 {
-		fmt.Println("{\"level\":\"info\",\"message\":\"Using v2 config\"}")
-	} else {
-		fmt.Println("{\"level\":\"error\",\"message\":\"Unsupported config version\"}")
-		panic("Unsupported config version")
-	}
 	err = V.Unmarshal(Cfg)
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("fatal error config file: %w", err))
