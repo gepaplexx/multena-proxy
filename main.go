@@ -90,7 +90,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if C.Dev.Enabled {
-		keycloakToken.PreferredUsername = "lucostus"
+		keycloakToken.PreferredUsername = C.Dev.Username
 	}
 
 	switch provider := C.Proxy.Provider; provider {
