@@ -1,58 +1,62 @@
 # Multena Proxy
+---
+> Making the LGTM-Stack MULti TENAncy ready
 
-Making the LGTM(P)-Stack MULti TENAncy ready
+**Multena Proxy** is a multi-tenancy ready tool designed to enhance the authorization capabilities of your LGTM (Loki
+Grafana Tempo Mimir/Prometheus) stack. Built with LBAC (Label Based Access Control) at its core, Multena provides secure
+and granular user authorization based on assigned tenant labels. It integrates seamlessly with Thanos and Loki, and
+supports Keycloak for identity management. With features like ConfigMap-based configuration, flexible authorization
+providers, and multiple tenant labels, Multena ensures that the right data is accessible to the right users.
 
-## What is Multena?
+---
 
-It is a proxy that Authorizes user based on LBAC -> label based access control.
+## How does it work?
 
-In general in enforces / appends the tenant labels the specific user is allowed to see
-and therefore no data will be leaked to users that are not allowed to see it.
+```mermaid
+graph LR
+    A[Query Request]
+    B{Label Matches?}
+    C{User Authorized?}
+    D[Append Label]
+    E[Return Query]
+    F[Forward Query]
+    
+    A --> B
+    B -- No --> D
+    B -- Yes --> C
+    C -- No --> E
+    C -- Yes --> F
+```
+
+In summary, here's how Multena works:
+
+1. Query Request: Multena receives a query request from a user.
+2. Label Matching: Multena examines the query and looks for label matches based on the specified tenant label.
+3. Label Appending: If the query does not contain the specified label match, Multena appends the label to the query.
+4. Authorization Check: If the query contains the specified label match, Multena checks if the user is allowed to query
+   the value of the label match.
+5. Query Return: If the user is not authorized to query the value of the label match, Multena returns the query and
+   prevents further processing.
+6. Forwarding Query: If the user is authorized to query the value of the label match, Multena forwards the query to the
+   specific endpoint or service responsible for processing it.
+
+By performing label matching, appending labels when necessary, and performing authorization checks, Multena ensures that
+users can only query data they are authorized to access.
 
 ## Multena Features
 
-Multena provides a range of features that enhance the authorization capabilities of your LGTM-stack:
+| **Feature**                      | **Description**                                                                                                                                                                                                             |
+|----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Authorization Based on Labels    | Enables access control and permissions based on specified labels, ensuring fine-grained access control tailored to your needs.                                                                                              |
+| Configurable via ConfigMap       | Allows easy configuration of the proxy using a ConfigMap, simplifying setup process and management of configuration settings.                                                                                               |
+| Flexible Authorization Providers | Supports both ConfigMap and database authorization providers. Choose the provider that best fits your requirements.                                                                                                         |
+| Integration with Thanos and Loki | Seamlessly integrates with Thanos and Loki for efficient authorization. Manage and control access to these powerful observability tools.                                                                                    |
+| Support for Keycloak and Jwks    | Provides support for Keycloak, a popular open-source identity and access management solution. Authenticate users using Keycloak and retrieve the JWKS (JSON Web Key Set) certificate for secure and reliable authorization. |
+| Admin Group Privileges           | Includes an admin group feature allowing users in the specified admin group to bypass authorization checks. This is useful for granting administrative privileges to specific users.                                        |
+| Multiple Tenant Labels           | Supports multiple tenant labels for managing different sets of labels for different tenants. Customize and control access for various groups and users based on their respective tenant labels.                             |
 
-### Authorization Based on Labels
-
-Multena enables authorization based on labels, allowing you to control access and permissions based on specified labels.
-This ensures fine-grained access control tailored to your needs.
-
-### Configurable via ConfigMap
-
-With Multena, you can easily configure the proxy using a ConfigMap. This simplifies the setup process and allows for
-convenient management of configuration settings.
-
-### Flexible Authorization Providers
-
-Multena supports both ConfigMap and database authorization providers. You have the flexibility to choose the provider
-that best fits your requirements. Whether you prefer the simplicity of ConfigMap or the versatility of a database,
-Multena has you covered.
-
-### Integration with Thanos and Loki
-
-Multena seamlessly integrates with Thanos and Loki, enabling efficient authorization for these components. You can
-leverage Multena to manage and control access to these powerful observability tools.
-
-### Support for Keycloak and Jwks
-
-Multena offers support for Keycloak, a popular open-source identity and access management solution. It can authenticate
-users using Keycloak and retrieve the JWKS (JSON Web Key Set) certificate, ensuring secure and reliable authorization.
-This protects against malformed tokens and prevents unauthorized access.
-
-### Admin Group Privileges
-
-Multena includes an admin group feature that allows users in the specified admin group to bypass authorization checks.
-This is particularly useful for granting administrative privileges to specific users.
-
-### Multiple Tenant Labels
-
-Multena supports multiple tenant labels, enabling the management of different sets of labels for different tenants.
-This allows you to customize and control access for various groups and users based on their respective tenant labels.
-
-By leveraging these powerful features, Multena enhances the authorization capabilities of your system, providing
-granular control over access permissions and facilitating seamless integration with Thanos, Loki, and identity providers
-like Keycloak.
+These powerful features enhance Multena's authorization capabilities, offering granular control over access permissions
+and facilitating seamless integration with Thanos, Loki, and identity providers like Keycloak.
 
 ## Currently queryable
 
@@ -222,13 +226,13 @@ and users.
       with
       the corresponding list of allowed namespaces. For example, the example_group is allowed to access the
       example_namespace, and the example_user is also allowed to access the example_namespace.
-   
+
 4. Add Multena as Grafana data source and configure it with the correct values:
    The Datasource needs two headers to be set:
     - `Accept-Encoding:"*/*"`
     - `X-Plugin-Id: <thanos or loki>`
-   to work properly it also needs the forward oauth identify option to be set.
-   The loki option may need the "/api/logs/v1/application/" url suffix to work properly
+      to work properly it also needs the forward oauth identify option to be set.
+      The loki option may need the "/api/logs/v1/application/" url suffix to work properly
 
-By following these steps and customizing the configuration options to your needs, you can effectively configure the
-Proxy Multena to work with your Grafana, Thanos, Loki, and database setup.
+By following these steps and customizing the configuration options to your needs, you can effectively configure
+Multena to work with your Grafana, Thanos, Loki, and database setup.
