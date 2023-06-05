@@ -2,10 +2,11 @@ package main
 
 import "github.com/golang-jwt/jwt/v5"
 
-type Cfg struct {
+type Config struct {
 	Version int `mapstructure:"version"`
 	Dev     struct {
 		Enabled             bool   `mapstructure:"enabled"`
+		Username            string `mapstructure:"username"`
 		ServiceAccountToken string `mapstructure:"service_account_token"`
 	} `mapstructure:"dev"`
 	Proxy struct {
@@ -13,11 +14,13 @@ type Cfg struct {
 		Provider     string `mapstructure:"provider"`
 		ThanosUrl    string `mapstructure:"thanos_url"`
 		LokiUrl      string `mapstructure:"loki_url"`
-		PromLabelUrl string `mapstructure:"prom_label_url"`
 		JwksCertURL  string `mapstructure:"jwks_cert_url"`
-		TenantLabel  string `mapstructure:"tenant_label"`
 		AdminGroup   string `mapstructure:"admin_group"`
 		Port         int    `mapstructure:"port"`
+		TenantLabels struct {
+			Thanos string `mapstructure:"thanos"`
+			Loki   string `mapstructure:"loki"`
+		} `mapstructure:"tenant_labels"`
 	} `mapstructure:"proxy"`
 	Db struct {
 		Enabled      bool   `mapstructure:"enabled"`

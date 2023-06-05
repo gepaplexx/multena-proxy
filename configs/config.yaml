@@ -4,17 +4,20 @@ proxy:
   provider: configmap
   thanos_url: https://localhost:3000
   loki_url: https://localhost:3000
-  prom_label_url: https://localhost:3000
-  jwks_cert_url: https://gp-sso-service.gp-sso.svc.cluster.local:8443/realms/internal/protocol/openid-connect/certs
-  tenant_label: namespace
+  jwks_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs
   admin_group: gepardec-run-admins
   port: 8080
+  tenant_labels:
+    thanos: namespace
+    loki: kubernetes_namespace_name
 db:
   user: multitenant
   password_path: "."
   host: localhost
   port: 3306
-  dbName: blubb
+  dbName: example
   query: "SELECT * FROM users WHERE username = ?"
 dev:
-  enabled: false
+  enabled: true
+  username: example
+  ServiceAccountToken: "fake"

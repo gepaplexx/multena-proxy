@@ -11,3 +11,11 @@ func ContainsIgnoreCase(s []string, e string) bool {
 	}
 	return false
 }
+
+func MapKeysToArray(tenentLabel map[string]bool) []string {
+	tenantLabelKeys := make([]string, 0, len(tenentLabel))
+	for key := range tenentLabel {
+		tenantLabelKeys = append(tenantLabelKeys, key)
+	}
+	return tenantLabelKeys
+}

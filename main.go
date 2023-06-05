@@ -28,11 +28,10 @@ func main() {
 	mux.Handle("/healthz", http.HandlerFunc(healthz))
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
 	mux.Handle("/", http.HandlerFunc(reverseProxy))
-	err := http.ListenAndServe(fmt.Sprintf(":%d", C.Proxy.Port), mux)
+	err := http.ListenAndServe(fmt.Sprintf("localhost:%d", Cfg.Proxy.Port), mux)
 	if err != nil {
 		Logger.Panic("Error while serving", zap.Error(err))
 	}
-
 }
 
 func healthz(w http.ResponseWriter, _ *http.Request) {
@@ -42,6 +41,11 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 }
 
 func reverseProxy(rw http.ResponseWriter, req *http.Request) {
+	var upstreamUrl *url.URL
+	var enforceFunc func(string, map[string]bool) (string, error)
+	var tenantLabels map[string]bool
+	query := req.URL.Query().Get("query")
+
 	logRequest(req)
 	Logger.Debug("url request", zap.String("url", req.URL.String()))
 
@@ -52,7 +56,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	tokenString := getBearerToken(req)
 	keycloakToken, token, err := parseJwtToken(tokenString)
-	if err != nil && !C.Dev.Enabled {
+	if err != nil && !Cfg.Dev.Enabled {
 		logAndWriteError(rw, "Error parsing Keycloak token", http.StatusForbidden, err)
 		return
 	}
@@ -67,86 +71,70 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var upstreamUrl *url.URL
-	if ContainsIgnoreCase(keycloakToken.Groups, C.Proxy.AdminGroup) || ContainsIgnoreCase(keycloakToken.ApaGroupsOrg, C.Proxy.AdminGroup) {
-		switch req.Header.Get("X-Plugin-Id") {
-		case "loki":
-			upstreamUrl, err = url.Parse(C.Proxy.LokiUrl)
-		case "thanos":
-			upstreamUrl, err = url.Parse(C.Proxy.ThanosUrl)
-		}
-		if err != nil {
-			logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
-			return
-		}
-	} else {
-		var tenantLabels []string
-		switch provider := C.Proxy.Provider; provider {
-		case "mysql":
-			tenantLabels = GetLabelsFromDB(keycloakToken.Email)
-		case "configmap":
-			tenantLabels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
-		default:
-			logAndWriteError(rw, "No provider set", http.StatusForbidden, nil)
-			return
-		}
-
-		if len(tenantLabels) <= 0 {
-			logAndWriteError(rw, "No tenant labels found", http.StatusForbidden, nil)
-			return
-		}
-
-		Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
-		Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
-
-		if req.Header.Get("X-Plugin-Id") == "loki" {
-			upstreamUrl, err = url.Parse(C.Proxy.LokiUrl)
-			if err != nil {
-				logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
-				return
-			}
-			query := req.URL.Query().Get("query")
-			query, err = logqlEnforcer(query, tenantLabels)
-			if err != nil {
-				logAndWriteError(rw, "Error parsing rewritten query", http.StatusForbidden, err)
-				return
-			}
-			values := req.URL.Query()
-			values.Set("query", query)
-			req.URL.RawQuery = values.Encode()
-		}
-
-		if req.Header.Get("X-Plugin-Id") == "thanos" {
-			upstreamUrl, err = url.Parse(C.Proxy.PromLabelUrl)
-			if err != nil {
-				logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
-				return
-			}
-			values := req.URL.Query()
-			for _, tl := range tenantLabels {
-				values.Add(C.Proxy.TenantLabel, tl)
-			}
-			req.URL.RawQuery = values.Encode()
-		}
-
+	if req.Header.Get("X-Plugin-Id") == "thanos" {
+		upstreamUrl, err = url.Parse(Cfg.Proxy.ThanosUrl)
+		enforceFunc = promqlEnforcer
 	}
+
+	if req.Header.Get("X-Plugin-Id") == "loki" {
+		upstreamUrl, err = url.Parse(Cfg.Proxy.LokiUrl)
+		enforceFunc = logqlEnforcer
+	}
+	if err != nil {
+		logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
+		return
+	}
+
+	if isAdminSkip(keycloakToken) {
+		goto DoRequest
+	}
+
+	if Cfg.Dev.Enabled {
+		keycloakToken.PreferredUsername = Cfg.Dev.Username
+	}
+
+	switch provider := Cfg.Proxy.Provider; provider {
+	case "mysql":
+		tenantLabels = GetLabelsFromDB(keycloakToken.Email)
+	case "configmap":
+		tenantLabels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
+	default:
+		logAndWriteError(rw, "No provider set", http.StatusForbidden, nil)
+		return
+	}
+
+	Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
+
+	if len(tenantLabels) <= 0 {
+		logAndWriteError(rw, "No tenant labels found", http.StatusForbidden, nil)
+		return
+	}
+	Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
+
+	query, err = enforceFunc(query, tenantLabels)
+	if err != nil {
+		logAndWriteError(rw, "Error modifying query", http.StatusForbidden, err)
+		return
+	}
+
+DoRequest:
+
+	values := req.URL.Query()
+	values.Set("query", query)
+	req.URL.RawQuery = values.Encode()
 
 	req.Host = upstreamUrl.Host
 	req.URL.Host = upstreamUrl.Host
 	req.URL.Path = upstreamUrl.Path + req.URL.Path
 	req.URL.Scheme = upstreamUrl.Scheme
 	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
-
-	logRequest(req)
-	req.RequestURI = ""
-	logRequest(req)
+	req.RequestURI = "" //need to be cleared cuz generated
 
 	originServerResponse, err := http.DefaultClient.Do(req)
 	if err != nil {
 		logAndWriteError(rw, "Error while calling upstream", http.StatusForbidden, err)
 		return
 	}
-
 	logResponse(originServerResponse)
 
 	originBody, err := io.ReadAll(originServerResponse.Body)
@@ -173,7 +161,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 }
 
 func hasAuthorizationHeader(req *http.Request) bool {
-	return req.Header.Get("Authorization") != ""
+	authorization := req.Header.Get("Authorization")
+	return authorization != "" && len(authorization) >= 7
 }
 
 func getBearerToken(req *http.Request) string {
@@ -181,7 +170,11 @@ func getBearerToken(req *http.Request) string {
 }
 
 func isValidToken(token *jwt.Token) bool {
-	return token.Valid || C.Dev.Enabled
+	return token.Valid || Cfg.Dev.Enabled
+}
+
+func isAdminSkip(token KeycloakToken) bool {
+	return ContainsIgnoreCase(token.Groups, Cfg.Proxy.AdminGroup) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Proxy.AdminGroup)
 }
 
 func logAndWriteError(rw http.ResponseWriter, message string, statusCode int, err error) {
@@ -201,12 +194,17 @@ func logRequest(req *http.Request) {
 func logResponse(res *http.Response) {
 	dump, err := httputil.DumpResponse(res, true)
 	if err != nil {
-		Logger.Error("Error while dumping request", zap.Error(err))
+		Logger.Error("Error while dumping response", zap.Error(err))
 	}
-	Logger.Debug("Response", zap.String("request", string(dump)))
+	Logger.Debug("Response", zap.String("response", string(dump)))
 }
 func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
 	keycloakToken := KeycloakToken{}
-	token, err := jwt.ParseWithClaims(tokenString, &keycloakToken, Jwks.Keyfunc)
+	token, err := jwt.ParseWithClaims(tokenString, keycloakToken, func(token *jwt.Token) (interface{}, error) {
+		return nil, fmt.Errorf("unable to verify token")
+	})
+	if !Cfg.Dev.Enabled {
+		token, err = jwt.ParseWithClaims(tokenString, &keycloakToken, Jwks.Keyfunc)
+	}
 	return keycloakToken, token, err
 }
