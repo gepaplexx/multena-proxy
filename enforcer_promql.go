@@ -31,8 +31,8 @@ func promqlEnforcer(query string, allowedTenantLabels map[string]bool) (string, 
 		return "", err
 	}
 
-	le := createEnforcer(tenantLabels)
-	err = le.EnforceNode(expr)
+	labelEnforcer := createEnforcer(tenantLabels)
+	err = labelEnforcer.EnforceNode(expr)
 	if err != nil {
 		Logger.Debug("error", zap.Error(err))
 		return "", err
