@@ -3,7 +3,7 @@ module github.com/gepaplexx/multena-proxy
 go 1.20
 
 require (
-	github.com/MicahParks/keyfunc/v2 v2.0.3
+	github.com/MicahParks/keyfunc/v2 v2.1.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang-jwt/jwt/v5 v5.0.0
