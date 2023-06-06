@@ -1,10 +1,9 @@
-FROM registry.access.redhat.com/ubi9/ubi-micro:9.2-5
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2
 EXPOSE 8080
+RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
 USER 1001
-#RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
-RUN microdnf update -y && microdnf install -y ca-certificates curl && microdnf clean all
 WORKDIR /app/
-COPY  ./multena-proxy .
-#RUN chgrp -R 0 /app && chmod -R g=u /app
+COPY multena-proxy .
+RUN chgrp -R 0 /app && chmod -R g=u /app
 HEALTHCHECK --timeout=10s CMD curl --fail http://localhost:8080/healthz || exit 1
 ENTRYPOINT [ "/app/multena-proxy" ]
