@@ -1,7 +1,7 @@
 # Multena Proxy
 
 Making the LGTM-Stack **mul**ti **tena**ncy ready
-    
+
 [![Go Report Card](https://goreportcard.com/badge/github.com/gepaplexx/multena-proxy)](https://goreportcard.com/report/github.com/gepaplexx/multena-proxy)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/gepaplexx/multena-proxy/release.yml?label=build)](https://github.com/gepaplexx/multena-proxy/actions/workflows/release.yml)
 [![GoDoc](https://godoc.org/github.com/gepaplexx/multena-proxy?status.svg)](https://godoc.org/github.com/gepaplexx/multena-proxy)
@@ -11,7 +11,8 @@ Making the LGTM-Stack **mul**ti **tena**ncy ready
 
 ---
 **Multena Proxy** is a multi-tenancy ready tool designed to enhance the authorization capabilities of your LGTM (Loki
-Grafana Tempo Mimir/Prometheus) stack. Built with LBAC (Label Based Access Control) at its core, Multena provides secure
+Grafana Tempo Mimir/Prometheus/Thanos) stack. Built with LBAC (Label Based Access Control) at its core, Multena provides
+secure
 and granular user authorization based on assigned tenant labels. It integrates seamlessly with Thanos and Loki, and
 supports Keycloak for identity management. With features like ConfigMap-based configuration, flexible authorization
 providers, and multiple tenant labels, Multena ensures that the right data is accessible to the right users.
@@ -32,19 +33,19 @@ graph LR
     A --> B
     B -- No --> E
     B -- Yes --> C
-    C -- No --> E
+    C -- No --> D
     C -- Yes --> F
 ```
 
 In summary, here's how Multena works:
 
-1. The query request is received (A).
-2. Multena checks if the user is authorized to access the query (B).
-3. If the user is not authorized, Multena returns the query without further processing (E).
-4. If the user is authorized, Multena checks if there are any label matches in the query (C).
-5. If there are no label matches, Multena appends the appropriate label to the query (D).
+1. The query request is received.
+2. Multena checks if the user is authorized to access the query.
+3. If the user is not authorized, Multena returns the query without further processing.
+4. If the user is authorized, Multena checks if there are any label matches in the query.
+5. If there are no label matches, Multena appends the appropriate label to the query.
 6. If there are label matches and the user is authorized to query the values of the labels, Multena forwards the query
-   to the specific endpoint or service responsible for processing it (F).
+   to the specific endpoint or service responsible for processing it.
 
 By performing label matching, appending labels when necessary, and performing authorization checks, Multena ensures that
 users can only query data they are authorized to access.
@@ -61,9 +62,6 @@ users can only query data they are authorized to access.
 | Admin Group Privileges                  | Includes an admin group feature allowing users in the specified admin group to bypass authorization checks. This is useful for granting administrative privileges to specific users.                                        |
 | Multiple Tenant Labels                  | Supports multiple tenant labels for managing different sets of labels for different tenants. Customize and control access for various groups and users based on their respective tenant labels.                             |
 | Communication with OpenShift Components | Multena sends a bearer token in requests to communicate with OpenShift components protected by OAuth2 proxy.                                                                                                                |
-
-These powerful features enhance Multena's authorization capabilities, offering granular control over access permissions
-and facilitating seamless integration with Thanos, Loki, and identity providers like Keycloak.
 
 ## Currently queryable
 
@@ -117,7 +115,7 @@ helm upgrade multena gepardec/gp-multena -n <grafana-namespace>
 > here [labels.yaml](./configs/labels.yaml)
 
 > On the other hand, Multena also supports the MySQL provider, which enables label lookup through executing a custom
-> query against a MySQL database. This powerful capability allows Multena to dynamically fetch the allowed namespaces
+> query against a MySQL database. This capability allows Multena to dynamically fetch the allowed namespaces
 > for a specified email or user. By setting the appropriate query in the configuration, Multena can seamlessly retrieve
 > the relevant label information from the MySQL database.
 
