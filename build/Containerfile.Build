@@ -6,11 +6,12 @@ COPY . .
 RUN go build .
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2
-EXPOSE 8080
 RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
-USER 1001
 WORKDIR /app/
 COPY --from=go-builder /app/multena-proxy/multena-proxy .
 RUN chgrp -R 0 /app && chmod -R g=u /app
+
+USER 1001
+EXPOSE 8080
 HEALTHCHECK --timeout=10s CMD curl --fail http://localhost:8080/healthz || exit 1
 ENTRYPOINT [ "/app/multena-proxy" ]
