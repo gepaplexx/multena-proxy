@@ -3,8 +3,7 @@ package main
 import "github.com/golang-jwt/jwt/v5"
 
 type Config struct {
-	Version int `mapstructure:"version"`
-	Dev     struct {
+	Dev struct {
 		Enabled             bool   `mapstructure:"enabled"`
 		Username            string `mapstructure:"username"`
 		ServiceAccountToken string `mapstructure:"service_account_token"`
@@ -17,6 +16,7 @@ type Config struct {
 		JwksCertURL  string `mapstructure:"jwks_cert_url"`
 		AdminGroup   string `mapstructure:"admin_group"`
 		Port         int    `mapstructure:"port"`
+		Host         string `mapstructure:"host"`
 		TenantLabels struct {
 			Thanos string `mapstructure:"thanos"`
 			Loki   string `mapstructure:"loki"`

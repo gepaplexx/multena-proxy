@@ -28,7 +28,7 @@ func main() {
 	mux.Handle("/healthz", http.HandlerFunc(healthz))
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
 	mux.Handle("/", http.HandlerFunc(reverseProxy))
-	err := http.ListenAndServe(fmt.Sprintf("localhost:%d", Cfg.Proxy.Port), mux)
+	err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Proxy.Host, Cfg.Proxy.Port), mux)
 	if err != nil {
 		Logger.Panic("Error while serving", zap.Error(err))
 	}
