@@ -2,6 +2,7 @@ FROM registry.access.redhat.com/ubi9/ubi-micro:9.2-5
 EXPOSE 8080
 USER 1001
 #RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
+RUN microdnf update -y && microdnf install -y ca-certificates curl && microdnf clean all
 WORKDIR /app/
 COPY  ./multena-proxy .
 #RUN chgrp -R 0 /app && chmod -R g=u /app
