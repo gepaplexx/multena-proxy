@@ -27,36 +27,36 @@ var (
 	V                   *viper.Viper
 )
 
+// init automatically gets called when the package is imported. It initializes the configuration and logging.
 func init() {
 	InitConfig()
 	InitLogging()
-}
-
-func doInit() {
 	Logger.Info("-------Init Proxy-------")
 	Logger.Info("Commit: ", zap.String("commit", Commit))
 	Logger.Info("Set http client to ignore self signed certificates")
 	Logger.Info("Config ", zap.Any("cfg", Cfg))
 	ServiceAccountToken = Cfg.Dev.ServiceAccountToken
-	if !Cfg.Dev.Enabled {
+	if !strings.HasSuffix(os.Args[0], ".test") {
+		fmt.Println("Not in test mode")
+		InitJWKS()
+		InitDB()
 		sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
 		if err != nil {
 			Logger.Panic("Error while reading service account token", zap.Error(err))
 		}
 		ServiceAccountToken = string(sa)
 	}
-	if !Cfg.Dev.Enabled {
-		InitJWKS()
-	}
-
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-
-	if Cfg.Db.Enabled {
-		InitDB()
+	if Cfg.Proxy.InsecureSkipVerify {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 	Logger.Info("------Init Complete------")
 }
 
+// doInit carries out the main initialization routine for the Proxy. It logs the commit information,
+// configures the HTTP client to ignore self-signed certificates, reads the service account token,
+// initializes JWKS if not in development mode, and establishes a database connection if enabled in the config.
+
+// InitConfig initializes the configuration from the files `config` and `labels` using Viper.
 func InitConfig() {
 	Cfg = &Config{}
 	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
@@ -64,6 +64,8 @@ func InitConfig() {
 	loadConfig("labels")
 }
 
+// onConfigChange is a callback that gets triggered when a configuration file changes.
+// It reloads the configuration from the files `config` and `labels`.
 func onConfigChange(e fsnotify.Event) {
 	//Todo: change log level on reload
 	Cfg = &Config{}
@@ -83,6 +85,8 @@ func onConfigChange(e fsnotify.Event) {
 	fmt.Printf("{\"level\":\"info\",\"message\":\"Config file changed: %s/\"}", e.Name)
 }
 
+// loadConfig loads the configuration from the specified file. It looks for the config file
+// in the `/etc/config/` directory and the `./configs` directory.
 func loadConfig(configName string) {
 	V.SetConfigName(configName) // name of config file (without extension)
 	V.SetConfigType("yaml")
@@ -101,9 +105,7 @@ func loadConfig(configName string) {
 	V.WatchConfig()
 }
 
-// InitLogging initializes the logger
-// The log level is set in the config file
-// The log level can be set to debug, info, warn, error, dpanic, panic, or fatal
+// InitLogging initializes the logger based on the log level specified in the config file.
 func InitLogging() *zap.Logger {
 	rawJSON := []byte(`{
 		"level": "` + strings.ToLower(Cfg.Proxy.LogLevel) + `",
@@ -130,6 +132,8 @@ func InitLogging() *zap.Logger {
 	return Logger
 }
 
+// InitJWKS initializes the JWKS (JSON Web Key Set) from a specified URL. It sets up the refresh parameters
+// for the JWKS and handles any errors that occur during the refresh.
 func InitJWKS() {
 	Logger.Info("Init Keycloak config")
 	jwksURL := Cfg.Proxy.JwksCertURL
@@ -155,6 +159,9 @@ func InitJWKS() {
 	Logger.Info("Finished Keycloak config")
 }
 
+// InitDB establishes a connection to the database if the `Db.Enabled` configuration setting is `true`.
+// It reads the database password from a file, sets up the database connection configuration,
+// and opens the database connection.
 func InitDB() {
 	if Cfg.Db.Enabled {
 		password, err := os.ReadFile(Cfg.Db.PasswordPath)
