@@ -72,6 +72,8 @@ users can only query data they are authorized to access.
 
 ## Request flow
 
+### integrated flow
+
 ```mermaid
 flowchart LR
     User -->|Authentication| Keycloak
@@ -79,6 +81,48 @@ flowchart LR
     Grafana -->|Jwks| Multena
     Multena --> Thanos
     Multena --> Loki
+```
+
+### request processing flow
+
+```mermaid
+flowchart TB
+    Start[Start Function] --> LogRequest
+    LogRequest -- Log the incoming request --> CheckAuth
+    CheckAuth{Has Authorization Header?} -- No --> Exit1[Exit Function]
+    CheckAuth -- Yes --> ParseJWT
+    ParseJWT -- Parse JWT token --> CheckTokenValidity
+    CheckTokenValidity{Is token valid?} -- No --> Exit2[Exit Function]
+    CheckTokenValidity -- Yes --> CheckPluginId
+    CheckPluginId{X-Plugin-Id header exists?} -- No --> Exit3[Exit Function]
+    CheckPluginId -- Yes --> CheckService
+    CheckService{Check Service: Thanos or Loki} -- Error --> Exit4[Exit Function]
+    CheckService -- No Error --> CheckAdmin
+    CheckAdmin{Is User Admin?} -- Yes --> DoRequest
+    CheckAdmin -- No --> CheckProvider
+    CheckProvider{Check Provider: MySQL or ConfigMap} -- Error --> Exit5[Exit Function]
+    CheckProvider -- No Error --> CheckTenantLabels
+    CheckTenantLabels{Are there tenant labels?} -- No --> Exit6[Exit Function]
+    CheckTenantLabels -- Yes --> EnforceQuery
+    EnforceQuery -- Modify Query according to labels --> DoRequest
+    DoRequest -- Send Request to upstream server --> HandleResponse
+    HandleResponse -- Read and write response --> End[End Function]
+
+    subgraph logic
+        LogRequest
+        CheckAuth
+        ParseJWT
+        CheckTokenValidity
+        CheckPluginId
+        CheckService
+        CheckAdmin
+        CheckProvider
+        CheckTenantLabels
+        EnforceQuery
+        DoRequest
+        HandleResponse
+    end
+
 ```
 
 ## Deploy Multena
@@ -234,10 +278,20 @@ and users.
 
 4. Add Multena as Grafana data source and configure it with the correct values:
    The Datasource needs two headers to be set:
-    - `Accept-Encoding:"*/*"`
-    - `X-Plugin-Id: <thanos or loki>`
-      to work properly it also needs the forward oauth identify option to be set.
-      The loki option may need the "/api/logs/v1/application/" url suffix to work properly
+   - `Accept-Encoding:"*/*"`
+   - `X-Plugin-Id: <thanos or loki>`
+     to work properly it also needs the forward oauth identify option to be set.
+     The loki option may need the "/api/logs/v1/application/" url suffix to work properly
 
 By following these steps and customizing the configuration options to your needs, you can effectively configure
 Multena to work with your Grafana, Thanos, Loki, and database setup.
+
+### Service Account Token Authentication
+
+Multena uses its service account token to authenticate with data sources. This is necessary because, in environments
+like OpenShift 4, data sources are typically protected by the OAuth2 proxy. This approach should be taken in
+non-OpenShift 4 environments as well.
+
+The right role bindings for Multena need to be set. In small OpenShift deployments, the cluster-monitoring-view role
+should be assigned. This role binding is set up by the helm chart during deployment. These steps ensure Multena can
+correctly access the data sources.
