@@ -9,6 +9,12 @@ import (
 	"time"
 )
 
+// logqlEnforcer enforces the LogQL query based on tenant labels. If the query is empty,
+// it sets a default query. It parses the provided query and walks through the expressions,
+// looking for stream match expressions. If a stream match expression is found, it updates
+// the matchers to match the tenant's labels. If no namespace matchers are found in the query,
+// it returns an error (namespace should be set in matchNamespaceMatcher therefore it's a validation).
+// If all is well, it logs the processed query and returns it.
 func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 	currentTime := time.Now()
 	if query == "" {
@@ -45,6 +51,11 @@ func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 	return expr.String(), nil
 }
 
+// matchNamespaceMatchers updates matchers based on tenantLabels. If the match name equals
+// the configured Loki tenant label, it checks if the match value exists in tenantLabels.
+// If a match value does not exist in tenantLabels, it returns an error. If no namespace
+// matchers are found in queryMatches, it adds a matcher that matches tenantLabels.
+// It returns the updated matchers.
 func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[string]bool) ([]*labels.Matcher, error) {
 	foundNamespace := false
 	for _, match := range queryMatches {
