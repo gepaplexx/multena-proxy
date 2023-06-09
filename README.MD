@@ -165,6 +165,28 @@ helm upgrade multena gepardec/gp-multena -n <grafana-namespace>
 
 ## Configuration
 
+### ConfigMap Mode
+
+For smaller deployments or for the introduction of a new client into a cluster, the 'manual' mode allows users to
+manually configure the 'users' and 'groups' fields. This gives fine-grained control over permissions and enables rapid
+setup for simpler environments
+
+However, for larger deployments where many users and groups with varied permissions already exist, a different approach
+is more efficient. Multena offers an auxiliary tool called
+the ['multena-rbac-collector'](https://github.com/gepaplexx/multena-rbac-collector). This tool, when run by an
+administrator, collects the specific pod 'get' permissions for each namespace for every user and group. The result is
+a 'labels.yaml' file which can be directly used by Multena. This automated collection greatly simplifies the setup for
+larger environments, ensuring the user doesn't need to manually input a multitude of permissions. However, it's
+important to note that this mode is suitable only when all required tenant label values are namespaces within the same
+cluster.
+
+### MySQL Mode
+
+This mode only makes sense if you have a MySQL database with a systematic way to get the permissions for a user. The
+query should return a list of labels for a user. The query should be configured in the config.yaml file. It is also
+important to enable caching for this database as the query will be executed for every request. For example if you have
+a Dashboard with 10 panels, the query will be executed 10 times.
+
 ### config.yaml
 
 #### proxy section
