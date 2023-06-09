@@ -27,7 +27,9 @@ var (
 	V                   *viper.Viper
 )
 
-// init automatically gets called when the package is imported. It initializes the configuration and logging.
+// init carries out the main initialization routine for the Proxy. It logs the commit information,
+// configures the HTTP client to ignore self-signed certificates, reads the service account token,
+// initializes JWKS if not in development mode, and establishes a database connection if enabled in the config.
 func init() {
 	InitConfig()
 	InitLogging()
@@ -39,22 +41,22 @@ func init() {
 	if !strings.HasSuffix(os.Args[0], ".test") {
 		fmt.Println("Not in test mode")
 		InitJWKS()
-		InitDB()
 		sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
 		if err != nil {
 			Logger.Panic("Error while reading service account token", zap.Error(err))
 		}
 		ServiceAccountToken = string(sa)
 	}
+
+	if Cfg.Db.Enabled {
+		InitDB()
+	}
+
 	if Cfg.Proxy.InsecureSkipVerify {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 	Logger.Info("------Init Complete------")
 }
-
-// doInit carries out the main initialization routine for the Proxy. It logs the commit information,
-// configures the HTTP client to ignore self-signed certificates, reads the service account token,
-// initializes JWKS if not in development mode, and establishes a database connection if enabled in the config.
 
 // InitConfig initializes the configuration from the files `config` and `labels` using Viper.
 func InitConfig() {
@@ -163,23 +165,22 @@ func InitJWKS() {
 // It reads the database password from a file, sets up the database connection configuration,
 // and opens the database connection.
 func InitDB() {
-	if Cfg.Db.Enabled {
-		password, err := os.ReadFile(Cfg.Db.PasswordPath)
-		if err != nil {
-			Logger.Panic("Could not read db password", zap.Error(err))
-		}
-		cfg := mysql.Config{
-			User:                 Cfg.Db.User,
-			Passwd:               string(password),
-			Net:                  "tcp",
-			AllowNativePasswords: true,
-			Addr:                 Cfg.Db.Host + ":" + fmt.Sprint(Cfg.Db.Port),
-			DBName:               Cfg.Db.DbName,
-		}
-		// Get a database handle.
-		DB, err = sql.Open("mysql", cfg.FormatDSN())
-		if err != nil {
-			Logger.Panic("Error opening DB connection", zap.Error(err))
-		}
+	password, err := os.ReadFile(Cfg.Db.PasswordPath)
+	if err != nil {
+		Logger.Panic("Could not read db password", zap.Error(err))
+	}
+	cfg := mysql.Config{
+		User:                 Cfg.Db.User,
+		Passwd:               string(password),
+		Net:                  "tcp",
+		AllowNativePasswords: true,
+		Addr:                 Cfg.Db.Host + ":" + fmt.Sprint(Cfg.Db.Port),
+		DBName:               Cfg.Db.DbName,
+	}
+	// Get a database handle.
+	DB, err = sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		Logger.Panic("Error opening DB connection", zap.Error(err))
+
 	}
 }
