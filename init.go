@@ -174,7 +174,7 @@ func InitDB() {
 		Passwd:               string(password),
 		Net:                  "tcp",
 		AllowNativePasswords: true,
-		Addr:                 Cfg.Db.Host + ":" + fmt.Sprint(Cfg.Db.Port),
+		Addr:                 fmt.Sprintf("%s:%d", Cfg.Db.Host, Cfg.Db.Port),
 		DBName:               Cfg.Db.DbName,
 	}
 	// Get a database handle.
@@ -183,4 +183,5 @@ func InitDB() {
 		Logger.Panic("Error opening DB connection", zap.Error(err))
 
 	}
+
 }
