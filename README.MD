@@ -6,18 +6,21 @@ Making the LGTM-Stack **mul**ti **tena**ncy ready
 [![Build Status](https://img.shields.io/github/actions/workflow/status/gepaplexx/multena-proxy/release.yml?label=build)](https://github.com/gepaplexx/multena-proxy/actions/workflows/release.yml)
 [![GoDoc](https://godoc.org/github.com/gepaplexx/multena-proxy?status.svg)](https://godoc.org/github.com/gepaplexx/multena-proxy)
 [![Release](https://img.shields.io/github/v/release/gepaplexx/multena-proxy)](https://github.com/gepaplexx/multena-proxy/releases/latest)
-[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/multena-proxy)](https://artifacthub.io/packages/search?repo=multena-proxy)
 ![License](https://img.shields.io/github/license/gepaplexx/multena-proxy)
 
 ---
 **Multena Proxy** is a multi-tenancy ready tool designed to enhance the authorization capabilities of your LGTM (Loki
-Grafana Tempo Mimir/Prometheus/Thanos) stack. Built with LBAC (Label Based Access Control) at its core, Multena provides
+Grafana Tempo Mimir(Prometheus Style API / OpenMetrics)) stack. Built with LBAC (Label Based Access Control) at its
+core, Multena provides
 secure
-and granular user authorization based on assigned tenant labels. It integrates seamlessly with Thanos and Loki, and
+and granular user authorization based on assigned tenant labels. It integrates seamlessly with PrometheusAPI and Loki,
+and
 supports Keycloak for identity management. With features like ConfigMap-based configuration, flexible authorization
 providers, and multiple tenant labels, Multena ensures that the right data is accessible to the right users.
 
 ---
+> __NOTE:__ Multena was specifically developed to support OpenShift 4's internal Prometheus, which is powered by Thanos.
+> As a result, many references in Multena are made to Thanos, which serves as an API following the Prometheus style.
 
 ## How does it work?
 
@@ -26,26 +29,31 @@ graph LR
     A[Query Request]
     B{User Authorized?}
     C{Label Matches?}
-    D[Append Label]
-    E[Return Query]
-    F[Forward Query]
+    D{Values Allowed?}
+    E[Append Label]
+    F[Return Query]
+    G[Forward Query]
     
     A --> B
-    B -- No --> E
+    B -- No --> F
     B -- Yes --> C
-    C -- No --> D
-    C -- Yes --> F
+    C -- No --> E
+    C -- Yes --> D
+    D -- No --> F
+    D -- Yes --> G
 ```
 
 In summary, here's how Multena works:
 
-1. The query request is received.
-2. Multena checks if the user is authorized to access the query.
+1. Multena receives a query request.
+2. Multena performs an authorization check to determine if the user is allowed to access the query.
 3. If the user is not authorized, Multena returns the query without further processing.
-4. If the user is authorized, Multena checks if there are any label matches in the query.
+4. If the user is authorized, Multena examines the query for label matches.
 5. If there are no label matches, Multena appends the appropriate label to the query.
-6. If there are label matches and the user is authorized to query the values of the labels, Multena forwards the query
-   to the specific endpoint or service responsible for processing it.
+6. If there are label matches, Multena checks if the values in the label match are allowed for the user.
+7. If the values are not allowed, Multena returns the query without further processing.
+8. If the values are allowed, Multena forwards the query to the specific endpoint or service responsible for processing
+   it.
 
 By performing label matching, appending labels when necessary, and performing authorization checks, Multena ensures that
 users can only query data they are authorized to access.
@@ -57,10 +65,10 @@ users can only query data they are authorized to access.
 | Authorization Based on Labels           | Enables access control and permissions based on specified labels, ensuring fine-grained access control tailored to your needs.                                                                                              |
 | Configurable via ConfigMap              | Allows easy configuration of the proxy using a ConfigMap, simplifying setup process and management of configuration settings.                                                                                               |
 | Flexible Authorization Providers        | Supports both ConfigMap and database authorization providers. Choose the provider that best fits your requirements.                                                                                                         |
-| Integration with Thanos and Loki        | Seamlessly integrates with Thanos and Loki for efficient authorization. Manage and control access to these powerful observability tools.                                                                                    |
+| Integration with PrometheusAPI and Loki | Seamlessly integrates with PrometheusAPI and Loki for efficient authorization. Manage and control access to these powerful observability tools.                                                                             |
 | Support for Keycloak and Jwks           | Provides support for Keycloak, a popular open-source identity and access management solution. Authenticate users using Keycloak and retrieve the JWKS (JSON Web Key Set) certificate for secure and reliable authorization. |
 | Admin Group Privileges                  | Includes an admin group feature allowing users in the specified admin group to bypass authorization checks. This is useful for granting administrative privileges to specific users.                                        |
-| Multiple Tenant Labels                  | Supports multiple tenant labels for managing different sets of labels for different tenants. Customize and control access for various groups and users based on their respective tenant labels.                             |
+| Multiple Tenant Label values            | Supports multiple tenant label values for managing different sets of label values for different tenants. Customize and control access for various groups and users based on their respective tenant label.                  |
 | Communication with OpenShift Components | Multena sends a bearer token in requests to communicate with OpenShift components protected by OAuth2 proxy.                                                                                                                |
 
 ## Currently queryable
@@ -104,7 +112,8 @@ flowchart TB
     CheckProvider -- No Error --> CheckTenantLabels
     CheckTenantLabels{Are there tenant labels?} -- No --> Exit6[Exit Function]
     CheckTenantLabels -- Yes --> EnforceQuery
-    EnforceQuery -- Modify Query according to labels --> DoRequest
+    EnforceQuery{Enforce Query and check if label values are allowed} -- Modify Query according to labels --> DoRequest
+    EnforceQuery -- Return Query --> Exit7[Exit Function]
     DoRequest -- Send Request to upstream server --> HandleResponse
     HandleResponse -- Read and write response --> End[End Function]
 
@@ -209,25 +218,29 @@ proxy:
 |-----------------------------------------------------------|----------------------------|-----------------------------------------------------------------------|
 | log level for the proxy                                   | proxy.log_level            | INFO                                                                  |
 | Determines whether to use a configmap or mysql for labels | proxy.provider             | configmap                                                             |
-| URL for Thanos                                            | proxy.thanos_url           | https://thanos.url:3000                                               |
+| URL for PrometheusAPI                                     | proxy.thanos_url           | https://thanos.url:3000                                               |
 | URL for Loki                                              | proxy.loki_url             | https://loki.url:3000                                                 |
 | URL for the JWKS certificate                              | proxy.jwks_cert_url        | https://sso.example.com/realms/internal/protocol/openid-connect/certs |
 | Admin group for the proxy which skips authorization       | proxy.admin_group          | gepardec-run-admins                                                   |
 | Port on which the proxy will listen                       | proxy.port                 | 8080                                                                  |
-| Tenant label for Thanos to be enforced                    | proxy.tenant_labels.thanos | namespace                                                             |
+| Tenant label for PrometheusAPI to be enforced             | proxy.tenant_labels.thanos | namespace                                                             |
 | Tenant label for Loki to be enforced                      | proxy.tenant_labels.loki   | kubernetes_namespace_name                                             |
 
 #### db section
 
 ```yaml
 db:
-  user: multitenant
-  password_path: "."
-  host: localhost
-  port: 3306
-  dbName: example
-  query: "SELECT * FROM users WHERE username = ?"
+   user: multitenant
+   password_path: "."
+   host: localhost
+   port: 3306
+   dbName: example
+   query: "SELECT * FROM users WHERE username = ?"
 ```
+
+The table below provides a breakdown of each configuration option, its corresponding value, and a brief explanation of
+its purpose. You can customize these values according to your specific requirements when configuring the database for
+Multena.
 
 | Configuration    | Value                                    | Explanation                              |
 |------------------|------------------------------------------|------------------------------------------|
@@ -237,10 +250,6 @@ db:
 | db.port          | 3306                                     | port of the database                     |
 | db.dbName        | example                                  | name of the database                     |
 | db.query         | "SELECT * FROM users WHERE username = ?" | query to retrieve data from the database |
-
-The table above provides a breakdown of each configuration option, its corresponding value, and a brief explanation of
-its purpose. You can customize these values according to your specific requirements when configuring the database for
-Multena.
 
 ### labels.yaml
 
@@ -270,22 +279,22 @@ and users.
 
 3. Modify the configuration options according to your requirements. Here's an overview of the options you might need to
    modify:
+   1.
+      - For `provider` set either configmap or mysql depending on your needs.
 
-    - For `provider` set either configmap or mysql depending on your needs.
+      - Set the appropriate values for `log_level`, `thanos_url`, `loki_url`, `jwks_cert_url`, `admin_group`, and `port`
+        based on your environment and preferences.
 
-    - Set the appropriate values for `log_level`, `thanos_url`, `loki_url`, `jwks_cert_url`, `admin_group`, and `port`
-      based on your environment and preferences.
+      - Adjust the values of `tenant_labels.thanos` and `tenant_labels.loki` to match your desired tenant labels.
 
-    - Adjust the values of `tenant_labels.thanos` and `tenant_labels.loki` to match your desired tenant labels.
+      - If you don't need the development mode, set `dev.enabled` to `false`. Otherwise, set `dev.username`
+        and `dev.service_account_token` to appropriate values.
 
-    - If you don't need the development mode, set `dev.enabled` to `false`. Otherwise, set `dev.username`
-      and `dev.service_account_token` to appropriate values.
-
-    - 3.1 Database: If you use mysql as a provider update the `db` section with the correct values
+   2. Database: If you use mysql as a provider update the `db` section with the correct values
       for `user`, `password_path`, `host`, `port`, `dbName`, and `query` to connect to your database and execute the
       desired query.
 
-    - 3.2 ConfigMap: If you have set the current provider to ConfigMap, you need to configure the labels by using a
+   3. ConfigMap: If you have set the current provider to ConfigMap, you need to configure the labels by using a
       labels.yaml file with the following format:
       ```yaml
       groups:
