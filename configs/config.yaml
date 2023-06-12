@@ -1,10 +1,11 @@
 proxy:
-  log_level: DEBUG
+  log_level: INFO
   provider: configmap
   thanos_url: https://localhost:3000
   loki_url: https://localhost:3000
   jwks_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs
   admin_group: gepardec-run-admins
+  insecure_skip_verify: false
   port: 8080
   host: localhost
   tenant_labels:
@@ -18,6 +19,6 @@ db:
   dbName: example
   query: "SELECT * FROM users WHERE username = ?"
 dev:
-  enabled: true
+  enabled: false
   username: example
   ServiceAccountToken: "fake"

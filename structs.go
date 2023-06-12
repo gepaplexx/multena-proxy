@@ -9,15 +9,16 @@ type Config struct {
 		ServiceAccountToken string `mapstructure:"service_account_token"`
 	} `mapstructure:"dev"`
 	Proxy struct {
-		LogLevel     string `mapstructure:"log_level"`
-		Provider     string `mapstructure:"provider"`
-		ThanosUrl    string `mapstructure:"thanos_url"`
-		LokiUrl      string `mapstructure:"loki_url"`
-		JwksCertURL  string `mapstructure:"jwks_cert_url"`
-		AdminGroup   string `mapstructure:"admin_group"`
-		Port         int    `mapstructure:"port"`
-		Host         string `mapstructure:"host"`
-		TenantLabels struct {
+		LogLevel           string `mapstructure:"log_level"`
+		Provider           string `mapstructure:"provider"`
+		ThanosUrl          string `mapstructure:"thanos_url"`
+		LokiUrl            string `mapstructure:"loki_url"`
+		JwksCertURL        string `mapstructure:"jwks_cert_url"`
+		AdminGroup         string `mapstructure:"admin_group"`
+		InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
+		Port               int    `mapstructure:"port"`
+		Host               string `mapstructure:"host"`
+		TenantLabels       struct {
 			Thanos string `mapstructure:"thanos"`
 			Loki   string `mapstructure:"loki"`
 		} `mapstructure:"tenant_labels"`

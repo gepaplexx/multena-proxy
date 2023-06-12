@@ -11,8 +11,8 @@ import (
 	"net/url"
 )
 
+// main is the entry point of the application. It initializes necessary components, sets up HTTP routes, and starts the HTTP server.
 func main() {
-	doInit()
 	defer func(Logger *zap.Logger) {
 		err := Logger.Sync()
 
@@ -34,12 +34,20 @@ func main() {
 	}
 }
 
+// healthz is an HTTP handler that always returns an HTTP status of 200 and a response body of "Ok". It's commonly used for health checks.
 func healthz(w http.ResponseWriter, _ *http.Request) {
 	Logger.Debug("Healthz")
 	w.WriteHeader(http.StatusOK)
 	_, _ = fmt.Fprint(w, "Ok")
 }
 
+// reverseProxy serves as the primary request handler for the proxy. It evaluates the incoming
+// request's authorization and based on the "X-Plugin-Id" header, determines the upstream service.
+// For non-admin users, the function fetches user-specific tenant labels and modifies the request
+// query accordingly. The updated request is then forwarded to the selected upstream service.
+// It handles any encountered error by logging it and returning an appropriate HTTP error response.
+// The response from the upstream service is logged and relayed back to the client. After sending
+// the response, it ensures the upstream service response body is properly closed.
 func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	var upstreamUrl *url.URL
 	var enforceFunc func(string, map[string]bool) (string, error)
@@ -160,29 +168,35 @@ DoRequest:
 	}(originServerResponse.Body)
 }
 
+// hasAuthorizationHeader checks whether the given HTTP request contains an "Authorization" header.
 func hasAuthorizationHeader(req *http.Request) bool {
 	authorization := req.Header.Get("Authorization")
-	return authorization != "" && len(authorization) >= 7
+	return authorization != "" && len(authorization) > 7
 }
 
+// getBearerToken extracts the JWT token from the "Authorization" header in the given HTTP request.
 func getBearerToken(req *http.Request) string {
 	return req.Header.Get("Authorization")[7:]
 }
 
+// isValidToken checks whether a JWT token is valid or not.
 func isValidToken(token *jwt.Token) bool {
 	return token.Valid || Cfg.Dev.Enabled
 }
 
+// isAdminSkip checks if a user belongs to the admin group. It can bypass some checks for admin users.
 func isAdminSkip(token KeycloakToken) bool {
 	return ContainsIgnoreCase(token.Groups, Cfg.Proxy.AdminGroup) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Proxy.AdminGroup)
 }
 
+// logAndWriteError logs an error and sends an error message as the HTTP response.
 func logAndWriteError(rw http.ResponseWriter, message string, statusCode int, err error) {
 	Logger.Error(message, zap.Error(err))
 	rw.WriteHeader(statusCode)
 	_, _ = fmt.Fprint(rw, message+"\n")
 }
 
+// logRequest logs the details of an incoming HTTP request.
 func logRequest(req *http.Request) {
 	dump, err := httputil.DumpRequest(req, true)
 	if err != nil {
@@ -191,6 +205,7 @@ func logRequest(req *http.Request) {
 	Logger.Debug("Request", zap.String("request", string(dump)))
 }
 
+// logResponse logs the details of an HTTP response received from the upstream server.
 func logResponse(res *http.Response) {
 	dump, err := httputil.DumpResponse(res, true)
 	if err != nil {
@@ -198,6 +213,8 @@ func logResponse(res *http.Response) {
 	}
 	Logger.Debug("Response", zap.String("response", string(dump)))
 }
+
+// parseJwtToken parses a JWT token string into a Keycloak token and a JWT token. It returns an error if parsing fails.
 func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
 	keycloakToken := KeycloakToken{}
 	token, err := jwt.ParseWithClaims(tokenString, keycloakToken, func(token *jwt.Token) (interface{}, error) {
