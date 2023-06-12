@@ -43,7 +43,7 @@ func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 		}
 	})
 	if errMsg != nil {
-		Logger.Debug("error", zap.Error(errMsg), zap.Int("line", 164))
+		Logger.Error("error", zap.Error(errMsg), zap.Int("line", 164))
 		return "", errMsg
 	}
 	Logger.Debug("expr", zap.String("expr", expr.String()), zap.Any("tl", tenantLabels))
