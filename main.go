@@ -200,15 +200,6 @@ func logRequest(req *http.Request) {
 	Logger.Debug("Request", zap.String("request", string(dump)))
 }
 
-// logResponse logs the details of an HTTP response received from the upstream server.
-func logResponse(res *http.Response) {
-	dump, err := httputil.DumpResponse(res, true)
-	if err != nil {
-		Logger.Error("Error while dumping response", zap.Error(err))
-	}
-	Logger.Debug("Response", zap.String("response", string(dump)))
-}
-
 // parseJwtToken parses a JWT token string into a Keycloak token and a JWT token. It returns an error if parsing fails.
 func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
 	keycloakToken := KeycloakToken{}
