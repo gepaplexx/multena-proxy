@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
-	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/http/pprof"
@@ -82,7 +81,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	Logger.Debug("Token is valid")
 
-	if req.Header.Get("X-Plugin-Id") == "" {
+	if req.Header.Get("X-Plugin-Id") != "thanos" && req.Header.Get("X-Plugin-Id") != "loki" {
 		logAndWriteError(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
 		return
 	}
@@ -154,58 +153,14 @@ DoRequest:
 	values := req.URL.Query()
 	values.Set("query", query)
 	req.URL.RawQuery = values.Encode()
-
 	Logger.Debug("Set query")
 
-	req.Host = upstreamUrl.Host
-	Logger.Debug("Set Host")
-	req.URL.Host = upstreamUrl.Host
-	Logger.Debug("Set URL Host")
-	req.URL.Path = upstreamUrl.Path + req.URL.Path
-	Logger.Debug("Set URL Path")
-	req.URL.Scheme = upstreamUrl.Scheme
-	Logger.Debug("Set URL Scheme")
-	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", ServiceAccountToken))
 	Logger.Debug("Set Authorization header")
-	req.RequestURI = "" //need to be cleared cuz generated
-	Logger.Debug("Set RequestURI")
 
-	originServerResponse, err := http.DefaultClient.Do(req)
-	if err != nil {
-		logAndWriteError(rw, "Error while calling upstream", http.StatusForbidden, err)
-		return
-	}
-	Logger.Debug("Successfully called upstream")
+	proxy := httputil.NewSingleHostReverseProxy(upstreamUrl)
+	proxy.ServeHTTP(rw, req)
 
-	logResponse(originServerResponse)
-
-	originBody, err := io.ReadAll(originServerResponse.Body)
-	if err != nil {
-		logAndWriteError(rw, "Error reading origin response", http.StatusForbidden, err)
-		return
-	}
-
-	Logger.Debug("Successfully read origin response")
-
-	// return response to the client
-	rw.WriteHeader(http.StatusOK)
-	_, err = rw.Write(originBody)
-	if err != nil {
-		logAndWriteError(rw, "Error writing origin response to client", http.StatusInternalServerError, err)
-		return
-	}
-
-	Logger.Debug("Successfully wrote origin response to client")
-
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			logAndWriteError(rw, "Error closing body", http.StatusInternalServerError, err)
-			return
-		}
-	}(originServerResponse.Body)
-
-	Logger.Debug("Successfully closed origin response body")
 }
 
 // hasAuthorizationHeader checks whether the given HTTP request contains an "Authorization" header.

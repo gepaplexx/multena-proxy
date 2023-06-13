@@ -41,11 +41,14 @@ func init() {
 	if !strings.HasSuffix(os.Args[0], ".test") {
 		fmt.Println("Not in test mode")
 		InitJWKS()
-		sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
-		if err != nil {
-			Logger.Panic("Error while reading service account token", zap.Error(err))
+		if !Cfg.Dev.Enabled {
+			sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+			if err != nil {
+				Logger.Panic("Error while reading service account token", zap.Error(err))
+			}
+			ServiceAccountToken = string(sa)
 		}
-		ServiceAccountToken = string(sa)
+
 	}
 
 	if Cfg.Db.Enabled {
