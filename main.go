@@ -155,12 +155,20 @@ DoRequest:
 	values.Set("query", query)
 	req.URL.RawQuery = values.Encode()
 
+	Logger.Debug("Set query")
+
 	req.Host = upstreamUrl.Host
+	Logger.Debug("Set Host")
 	req.URL.Host = upstreamUrl.Host
+	Logger.Debug("Set URL Host")
 	req.URL.Path = upstreamUrl.Path + req.URL.Path
+	Logger.Debug("Set URL Path")
 	req.URL.Scheme = upstreamUrl.Scheme
+	Logger.Debug("Set URL Scheme")
 	req.Header.Set("Authorization", "Bearer "+ServiceAccountToken)
+	Logger.Debug("Set Authorization header")
 	req.RequestURI = "" //need to be cleared cuz generated
+	Logger.Debug("Set RequestURI")
 
 	originServerResponse, err := http.DefaultClient.Do(req)
 	if err != nil {
