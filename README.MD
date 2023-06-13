@@ -308,8 +308,7 @@ and users.
       example_namespace, and the example_user is also allowed to access the example_namespace.
 
 4. Add Multena as Grafana data source and configure it with the correct values:
-   The Datasource needs two headers to be set:
-   - `Accept-Encoding:"*/*"`
+   The Datasource needs one header to be set:
    - `X-Plugin-Id: <thanos or loki>`
      to work properly it also needs the forward oauth identify option to be set.
      The loki option may need the "/api/logs/v1/application/" url suffix to work properly
