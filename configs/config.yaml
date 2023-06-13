@@ -21,4 +21,4 @@ db:
 dev:
   enabled: false
   username: example
-  ServiceAccountToken: "fake"
+  service_account_token: "fake"
