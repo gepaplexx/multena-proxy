@@ -49,6 +49,8 @@ func healthz(w http.ResponseWriter, _ *http.Request) {
 // The response from the upstream service is logged and relayed back to the client. After sending
 // the response, it ensures the upstream service response body is properly closed.
 func reverseProxy(rw http.ResponseWriter, req *http.Request) {
+	Logger.Debug("Start reverseProxy")
+
 	var upstreamUrl *url.URL
 	var enforceFunc func(string, map[string]bool) (string, error)
 	var tenantLabels map[string]bool
@@ -62,6 +64,8 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	Logger.Debug("Has Authorization header")
+
 	tokenString := getBearerToken(req)
 	keycloakToken, token, err := parseJwtToken(tokenString)
 	if err != nil && !Cfg.Dev.Enabled {
@@ -69,43 +73,59 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	Logger.Debug("Parsed JWT token")
+
 	if !isValidToken(token) {
 		logAndWriteError(rw, "Invalid token", http.StatusForbidden, nil)
 		return
 	}
+
+	Logger.Debug("Token is valid")
 
 	if req.Header.Get("X-Plugin-Id") == "" {
 		logAndWriteError(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
 		return
 	}
 
+	Logger.Debug("Has X-Plugin-Id")
+
 	if req.Header.Get("X-Plugin-Id") == "thanos" {
 		upstreamUrl, err = url.Parse(Cfg.Proxy.ThanosUrl)
 		enforceFunc = promqlEnforcer
+		Logger.Debug("Parsed Thanos URL")
 	}
 
 	if req.Header.Get("X-Plugin-Id") == "loki" {
 		upstreamUrl, err = url.Parse(Cfg.Proxy.LokiUrl)
 		enforceFunc = logqlEnforcer
+		Logger.Debug("Parsed Loki URL")
 	}
+
 	if err != nil {
 		logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
 		return
 	}
 
+	Logger.Debug("No error in parsing URLs")
+
 	if isAdminSkip(keycloakToken) {
 		goto DoRequest
 	}
 
+	Logger.Debug("Not admin user, enforcing query")
+
 	if Cfg.Dev.Enabled {
 		keycloakToken.PreferredUsername = Cfg.Dev.Username
+		Logger.Debug("Development mode enabled, set preferred username")
 	}
 
 	switch provider := Cfg.Proxy.Provider; provider {
 	case "mysql":
 		tenantLabels = GetLabelsFromDB(keycloakToken.Email)
+		Logger.Debug("Fetched labels from MySQL")
 	case "configmap":
 		tenantLabels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
+		Logger.Debug("Fetched labels from ConfigMap")
 	default:
 		logAndWriteError(rw, "No provider set", http.StatusForbidden, nil)
 		return
@@ -125,7 +145,11 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	Logger.Debug("Modified query successfully")
+
 DoRequest:
+
+	Logger.Debug("Doing request")
 
 	values := req.URL.Query()
 	values.Set("query", query)
@@ -143,6 +167,8 @@ DoRequest:
 		logAndWriteError(rw, "Error while calling upstream", http.StatusForbidden, err)
 		return
 	}
+	Logger.Debug("Successfully called upstream")
+
 	logResponse(originServerResponse)
 
 	originBody, err := io.ReadAll(originServerResponse.Body)
@@ -150,6 +176,8 @@ DoRequest:
 		logAndWriteError(rw, "Error reading origin response", http.StatusForbidden, err)
 		return
 	}
+
+	Logger.Debug("Successfully read origin response")
 
 	// return response to the client
 	rw.WriteHeader(http.StatusOK)
@@ -159,6 +187,8 @@ DoRequest:
 		return
 	}
 
+	Logger.Debug("Successfully wrote origin response to client")
+
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
@@ -166,6 +196,8 @@ DoRequest:
 			return
 		}
 	}(originServerResponse.Body)
+
+	Logger.Debug("Successfully closed origin response body")
 }
 
 // hasAuthorizationHeader checks whether the given HTTP request contains an "Authorization" header.
