@@ -312,6 +312,8 @@ github.com/observatorium/api v0.1.3-0.20230609075556-82e9f1b32880 h1:qDj6593xuKc
 github.com/observatorium/api v0.1.3-0.20230609075556-82e9f1b32880/go.mod h1:PVBcD1cM8GEx7pv6CGr5xIH560ST+UdGxjD+Rs3f3wQ=
 github.com/observatorium/api v0.1.3-0.20230615133900-a29be6d1ccc2 h1:IA5JzKaE0sbcLWo0rk24nlGXuUlHbfKG7tnMOGtmuuM=
 github.com/observatorium/api v0.1.3-0.20230615133900-a29be6d1ccc2/go.mod h1:r4DRThFUFMxMnKftJ+qUix7cdcM+RzYaRuaZTLkFZp8=
+github.com/observatorium/api v0.1.3-0.20230616023935-684eb1bb4a45 h1:J2OEIsp8Xv1nen7NYpdNJ+f7cMU8pyCnFlLJsd27xRU=
+github.com/observatorium/api v0.1.3-0.20230616023935-684eb1bb4a45/go.mod h1:r4DRThFUFMxMnKftJ+qUix7cdcM+RzYaRuaZTLkFZp8=
 github.com/oklog/run v1.1.0/go.mod h1:sVPdnTZT1zYwAJeCMu2Th4T21pA3FPOQRfWjQlk7DVU=
 github.com/oklog/ulid v1.3.1 h1:EGfNDEx6MqHz8B3uNV6QAib1UR2Lm97sHi3ocA6ESJ4=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
