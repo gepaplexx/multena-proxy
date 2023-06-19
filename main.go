@@ -208,7 +208,7 @@ func isAdminSkip(token KeycloakToken) bool {
 }
 
 func containsApiV1Labels(s string) bool {
-	return strings.Contains(s, "/api/v1/labels") || strings.Contains(s, "/api/v1/series")
+	return strings.Contains(s, "/api/v1/label") || strings.Contains(s, "/api/v1/series")
 }
 
 func containsLoki(s string) bool {
