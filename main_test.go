@@ -203,7 +203,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			setPluginID:      true,
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "Error modifying query\n",
+			expectedBody:     "1:1: parse error: no expression found in input\n",
 		},
 		{
 			name:             "User belongs to multiple groups, accessing forbidden tenant",
@@ -342,7 +342,7 @@ func TestLogAndWriteError(t *testing.T) {
 	assert := assert.New(t)
 
 	rw := httptest.NewRecorder()
-	logAndWriteError(rw, "test error", http.StatusInternalServerError, nil)
+	logAndWriteErrorMsg(rw, "test error", http.StatusInternalServerError, nil)
 	assert.Equal(http.StatusInternalServerError, rw.Code)
 	assert.Equal("test error\n", rw.Body.String())
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
@@ -59,7 +60,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	Logger.Debug("url request", zap.String("url", req.URL.String()))
 
 	if !hasAuthorizationHeader(req) {
-		logAndWriteError(rw, "No Authorization header found", http.StatusForbidden, nil)
+		logAndWriteErrorMsg(rw, "No Authorization header found", http.StatusForbidden, nil)
 		return
 	}
 
@@ -68,21 +69,21 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	tokenString := getBearerToken(req)
 	keycloakToken, token, err := parseJwtToken(tokenString)
 	if err != nil && !Cfg.Dev.Enabled {
-		logAndWriteError(rw, "Error parsing Keycloak token", http.StatusForbidden, err)
+		logAndWriteErrorMsg(rw, "Error parsing Keycloak token", http.StatusForbidden, err)
 		return
 	}
 
 	Logger.Debug("Parsed JWT token")
 
 	if !isValidToken(token) {
-		logAndWriteError(rw, "Invalid token", http.StatusForbidden, nil)
+		logAndWriteErrorMsg(rw, "Invalid token", http.StatusForbidden, nil)
 		return
 	}
 
 	Logger.Debug("Token is valid")
 
 	if req.Header.Get("X-Plugin-Id") != "thanos" && req.Header.Get("X-Plugin-Id") != "loki" {
-		logAndWriteError(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
+		logAndWriteErrorMsg(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
 		return
 	}
 
@@ -101,7 +102,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if err != nil {
-		logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
+		logAndWriteErrorMsg(rw, "Error parsing upstream url", http.StatusForbidden, err)
 		return
 	}
 
@@ -126,21 +127,21 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		tenantLabels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
 		Logger.Debug("Fetched labels from ConfigMap")
 	default:
-		logAndWriteError(rw, "No provider set", http.StatusForbidden, nil)
+		logAndWriteErrorMsg(rw, "No provider set", http.StatusForbidden, nil)
 		return
 	}
 
 	Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
 
 	if len(tenantLabels) <= 0 {
-		logAndWriteError(rw, "No tenant labels found", http.StatusForbidden, nil)
+		logAndWriteErrorMsg(rw, "No tenant labels found", http.StatusForbidden, nil)
 		return
 	}
 	Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
 
 	query, err = enforceFunc(query, tenantLabels)
 	if err != nil {
-		logAndWriteError(rw, "Error modifying query", http.StatusForbidden, err)
+		logAndWriteError(rw, http.StatusForbidden, err)
 		return
 	}
 
@@ -184,11 +185,18 @@ func isAdminSkip(token KeycloakToken) bool {
 	return ContainsIgnoreCase(token.Groups, Cfg.Proxy.AdminGroup) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Proxy.AdminGroup)
 }
 
-// logAndWriteError logs an error and sends an error message as the HTTP response.
-func logAndWriteError(rw http.ResponseWriter, message string, statusCode int, err error) {
+// logAndWriteErrorMsg logs an error and sends an error message as the HTTP response.
+func logAndWriteErrorMsg(rw http.ResponseWriter, message string, statusCode int, err error) {
 	Logger.Error(message, zap.Error(err))
 	rw.WriteHeader(statusCode)
 	_, _ = fmt.Fprint(rw, message+"\n")
+}
+
+// logAndWriteError logs an error and sends an error message as the HTTP response.
+func logAndWriteError(rw http.ResponseWriter, statusCode int, err error) {
+	Logger.Error(err.Error(), zap.Error(err))
+	rw.WriteHeader(statusCode)
+	_, _ = fmt.Fprint(rw, err.Error()+"\n")
 }
 
 // logRequest logs the details of an incoming HTTP request.
@@ -197,7 +205,23 @@ func logRequest(req *http.Request) {
 	if err != nil {
 		Logger.Error("Error while dumping request", zap.Error(err))
 	}
-	Logger.Debug("Request", zap.String("request", string(dump)))
+	requestData := struct {
+		Method string      `json:"method"`
+		URL    string      `json:"url"`
+		Header http.Header `json:"header"`
+		Body   string      `json:"body"`
+	}{
+		Method: req.Method,
+		URL:    req.URL.String(),
+		Header: req.Header,
+		Body:   string(dump),
+	}
+
+	jsonData, err := json.Marshal(requestData)
+	if err != nil {
+		Logger.Error("Error while marshalling request", zap.Error(err))
+	}
+	Logger.Debug("Request", zap.String("request", string(jsonData)))
 }
 
 // parseJwtToken parses a JWT token string into a Keycloak token and a JWT token. It returns an error if parsing fails.
