@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
+	"strings"
 )
 
 // main is the entry point of the application. It initializes necessary components, sets up HTTP routes, and starts the HTTP server.
@@ -54,7 +55,31 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	var upstreamUrl *url.URL
 	var enforceFunc func(string, map[string]bool) (string, error)
 	var tenantLabels map[string]bool
-	query := req.URL.Query().Get("query")
+	var err error
+
+	urlKey := "query"
+	if containsApiV1Labels(req.URL.Path) {
+		urlKey = "match[]"
+	}
+	query := req.URL.Query().Get(urlKey)
+	if query == "" {
+		query = "{__name__=~\".+\"}"
+	}
+
+	upstreamUrl, err = url.Parse(Cfg.Proxy.ThanosUrl)
+	enforceFunc = promqlEnforcer
+	Logger.Debug("Parsed Thanos URL")
+
+	if containsLoki(req.URL.Path) {
+		upstreamUrl, err = url.Parse(Cfg.Proxy.LokiUrl)
+		enforceFunc = logqlEnforcer
+		Logger.Debug("Parsed Loki URL")
+	}
+
+	if err != nil {
+		logAndWriteErrorMsg(rw, "Error parsing upstream url", http.StatusInternalServerError, err)
+		return
+	}
 
 	logRequest(req)
 	Logger.Debug("url request", zap.String("url", req.URL.String()))
@@ -152,7 +177,7 @@ DoRequest:
 	Logger.Debug("Doing request")
 
 	values := req.URL.Query()
-	values.Set("query", query)
+	values.Set(urlKey, query)
 	req.URL.RawQuery = values.Encode()
 	Logger.Debug("Set query")
 
@@ -183,6 +208,14 @@ func isValidToken(token *jwt.Token) bool {
 // isAdminSkip checks if a user belongs to the admin group. It can bypass some checks for admin users.
 func isAdminSkip(token KeycloakToken) bool {
 	return ContainsIgnoreCase(token.Groups, Cfg.Proxy.AdminGroup) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Proxy.AdminGroup)
+}
+
+func containsApiV1Labels(s string) bool {
+	return strings.Contains(s, "/api/v1/labels")
+}
+
+func containsLoki(s string) bool {
+	return strings.Contains(s, "/loki")
 }
 
 // logAndWriteErrorMsg logs an error and sends an error message as the HTTP response.

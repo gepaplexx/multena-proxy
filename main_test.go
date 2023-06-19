@@ -202,8 +202,8 @@ func Test_reverseProxy(t *testing.T) {
 			pluginID:         "thanos",
 			setAuthorization: true,
 			setPluginID:      true,
-			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "1:1: parse error: no expression found in input\n",
+			expectedStatus:   http.StatusOK,
+			expectedBody:     "Upstream server response\n",
 		},
 		{
 			name:             "User belongs to multiple groups, accessing forbidden tenant",

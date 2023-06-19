@@ -17,9 +17,6 @@ import (
 // If all is well, it logs the processed query and returns it.
 func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 	currentTime := time.Now()
-	if query == "" {
-		query = "{__name__=~\".+\"}"
-	}
 
 	expr, err := logqlv2.ParseExpr(query)
 	if err != nil {
