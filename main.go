@@ -175,15 +175,15 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 DoRequest:
 
-	Logger.Debug("Doing request")
-
 	values := req.URL.Query()
 	values.Set(urlKey, query)
 	req.URL.RawQuery = values.Encode()
 	Logger.Debug("Set query")
 
+	Logger.Debug("Doing request")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", ServiceAccountToken))
 	Logger.Debug("Set Authorization header")
+	logRequest(req)
 
 	proxy := httputil.NewSingleHostReverseProxy(upstreamUrl)
 	proxy.ServeHTTP(rw, req)
