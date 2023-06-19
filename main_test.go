@@ -213,7 +213,7 @@ func Test_reverseProxy(t *testing.T) {
 			setPluginID:      true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "Error modifying query\n",
+			expectedBody:     "user not allowed with namespace forbidden_tenant\n",
 		},
 		{
 			name:             "User belongs to no groups, accessing forbidden tenant",
