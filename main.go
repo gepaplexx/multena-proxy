@@ -61,11 +61,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	if containsApiV1Labels(req.URL.Path) {
 		urlKey = "match[]"
 	}
-
 	query := req.URL.Query().Get(urlKey)
-	if query == "" {
-		query = "{__name__=~\".+\"}"
-	}
 
 	upstreamUrl, err = url.Parse(Cfg.Proxy.ThanosUrl)
 	enforceFunc = promqlEnforcer
@@ -212,7 +208,7 @@ func isAdminSkip(token KeycloakToken) bool {
 }
 
 func containsApiV1Labels(s string) bool {
-	return strings.Contains(s, "/api/v1/labels")
+	return strings.Contains(s, "/api/v1/labels") || strings.Contains(s, "/api/v1/series")
 }
 
 func containsLoki(s string) bool {
