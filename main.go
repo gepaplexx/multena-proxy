@@ -61,6 +61,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	if containsApiV1Labels(req.URL.Path) {
 		urlKey = "match[]"
 	}
+
 	query := req.URL.Query().Get(urlKey)
 	if query == "" {
 		query = "{__name__=~\".+\"}"
