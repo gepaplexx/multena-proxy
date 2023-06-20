@@ -246,8 +246,13 @@ func logRequest(req *http.Request) {
 		Header: req.Header,
 		Body:   string(dump),
 	}
+	if !Cfg.Proxy.LogTokens {
+		requestData.Header.Del("Authorization")
+		requestData.Header.Del("X-Plugin-Id")
+	}
 
 	jsonData, err := json.Marshal(requestData)
+
 	if err != nil {
 		Logger.Error("Error while marshalling request", zap.Error(err))
 	}
