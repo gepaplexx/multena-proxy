@@ -16,9 +16,10 @@ type Config struct {
 		JwksCertURL        string `mapstructure:"jwks_cert_url"`
 		AdminGroup         string `mapstructure:"admin_group"`
 		InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
+		LogTokens          bool   `mapstructure:"log_tokens"`
+		UsePluginToken     bool   `mapstructure:"use_plugin_token"`
 		Port               int    `mapstructure:"port"`
 		Host               string `mapstructure:"host"`
-		LogTokens          bool   `mapstructure:"log_tokens"`
 		TenantLabels       struct {
 			Thanos string `mapstructure:"thanos"`
 			Loki   string `mapstructure:"loki"`

@@ -106,7 +106,9 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 
 	Logger.Debug("Token is valid")
 
-	if req.Header.Get("X-Plugin-Id") != "thanos" && req.Header.Get("X-Plugin-Id") != "loki" {
+	if Cfg.Proxy.UsePluginToken &&
+		req.Header.Get("X-Plugin-Id") != "thanos" &&
+		req.Header.Get("X-Plugin-Id") != "loki" {
 		logAndWriteErrorMsg(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
 		return
 	}
