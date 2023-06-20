@@ -18,12 +18,15 @@ import (
 func promqlEnforcer(query string, allowedTenantLabels map[string]bool) (string, error) {
 	currentTime := time.Now()
 	if query == "" {
+		operator := "="
 		if len(allowedTenantLabels) > 1 {
-			query = fmt.Sprintf("{%s=~\"%s\"}", Cfg.Proxy.TenantLabels.Thanos, strings.Join(MapKeysToArray(allowedTenantLabels), "|"))
-		} else {
-			query = fmt.Sprintf("{%s=\"%s\"}", Cfg.Proxy.TenantLabels.Thanos, strings.Join(MapKeysToArray(allowedTenantLabels), "|"))
+			operator = "=~"
 		}
-
+		query = fmt.Sprintf("{%s%s\"%s\"}",
+			Cfg.Proxy.TenantLabels.Thanos,
+			operator,
+			strings.Join(MapKeysToArray(allowedTenantLabels),
+				"|"))
 	}
 	Logger.Debug("Start promqlEnforcer", zap.String("query", query), zap.Time("time", currentTime))
 	expr, err := parser.ParseExpr(query)
