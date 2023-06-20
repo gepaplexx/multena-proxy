@@ -339,9 +339,3 @@ func TestLogAndWriteError(t *testing.T) {
 	assert.Equal(http.StatusInternalServerError, rw.Code)
 	assert.Equal("test error\n", rw.Body.String())
 }
-
-func TestParseJwtToken(t *testing.T) {
-	// Here you would typically set up a mock of Jwks.Keyfunc and then verify that
-	// jwt.ParseWithClaims is called with the appropriate arguments.
-	// However, due to complexity and without exact structure, skipping this test case.
-}
