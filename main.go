@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/http/pprof"
@@ -166,6 +168,22 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		logAndWriteError(rw, http.StatusForbidden, err)
 		return
 	}
+	if req.Method == http.MethodPost {
+		if err := req.ParseForm(); err != nil {
+			logAndWriteErrorMsg(rw, "Error processing Post request", http.StatusForbidden, err)
+			return
+		}
+		Logger.Debug("Parsed form", zap.Any("form", req.PostForm))
+		body := req.PostForm
+		query, err = enforceFunc(body.Get(urlKey), tenantLabels)
+		body.Set(urlKey, query)
+
+		// We are replacing request body, close previous one (ParseForm ensures it is read fully and not nil).
+		_ = req.Body.Close()
+		newBody := body.Encode()
+		req.Body = io.NopCloser(strings.NewReader(newBody))
+		req.ContentLength = int64(len(newBody))
+	}
 
 	Logger.Debug("Modified query successfully")
 
@@ -231,10 +249,14 @@ func logAndWriteError(rw http.ResponseWriter, statusCode int, err error) {
 
 // logRequest logs the details of an incoming HTTP request.
 func logRequest(req *http.Request) {
-	dump, err := httputil.DumpRequest(req, true)
-	if err != nil {
-		Logger.Error("Error while dumping request", zap.Error(err))
+	var bodyBytes []byte
+	if req.Body != nil {
+		bodyBytes, _ = io.ReadAll(req.Body)
 	}
+
+	// Restore the io.ReadCloser to its original state
+	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
 	requestData := struct {
 		Method string      `json:"method"`
 		URL    string      `json:"url"`
@@ -244,17 +266,24 @@ func logRequest(req *http.Request) {
 		Method: req.Method,
 		URL:    req.URL.String(),
 		Header: req.Header,
-		Body:   string(dump),
+		Body:   string(bodyBytes),
 	}
+
 	if !Cfg.Proxy.LogTokens {
-		requestData.Header.Del("Authorization")
-		requestData.Header.Del("X-Plugin-Id")
+		// Make a copy of the header map so we're not modifying the original
+		copyHeader := make(http.Header)
+		for k, v := range requestData.Header {
+			copyHeader[k] = v
+		}
+		copyHeader.Del("Authorization")
+		copyHeader.Del("X-Plugin-Id")
+		requestData.Header = copyHeader
 	}
 
 	jsonData, err := json.Marshal(requestData)
-
 	if err != nil {
 		Logger.Error("Error while marshalling request", zap.Error(err))
+		return
 	}
 	Logger.Debug("Request", zap.String("request", string(jsonData)))
 }
