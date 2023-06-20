@@ -182,13 +182,6 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Error parsing Keycloak token\n",
 		},
 		{
-			name:             "Missing x-plugin-id header",
-			expectedStatus:   http.StatusForbidden,
-			setAuthorization: true,
-			authorization:    "Bearer " + tokens["noTenant"],
-			expectedBody:     "No X-Plugin-Id header found\n",
-		},
-		{
 			name:             "Missing tenant labels for user",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
@@ -202,8 +195,8 @@ func Test_reverseProxy(t *testing.T) {
 			pluginID:         "thanos",
 			setAuthorization: true,
 			setPluginID:      true,
-			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "Error modifying query\n",
+			expectedStatus:   http.StatusOK,
+			expectedBody:     "Upstream server response\n",
 		},
 		{
 			name:             "User belongs to multiple groups, accessing forbidden tenant",
@@ -213,7 +206,7 @@ func Test_reverseProxy(t *testing.T) {
 			setPluginID:      true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "Error modifying query\n",
+			expectedBody:     "user not allowed with namespace forbidden_tenant\n",
 		},
 		{
 			name:             "User belongs to no groups, accessing forbidden tenant",
@@ -342,13 +335,7 @@ func TestLogAndWriteError(t *testing.T) {
 	assert := assert.New(t)
 
 	rw := httptest.NewRecorder()
-	logAndWriteError(rw, "test error", http.StatusInternalServerError, nil)
+	logAndWriteErrorMsg(rw, "test error", http.StatusInternalServerError, nil)
 	assert.Equal(http.StatusInternalServerError, rw.Code)
 	assert.Equal("test error\n", rw.Body.String())
-}
-
-func TestParseJwtToken(t *testing.T) {
-	// Here you would typically set up a mock of Jwks.Keyfunc and then verify that
-	// jwt.ParseWithClaims is called with the appropriate arguments.
-	// However, due to complexity and without exact structure, skipping this test case.
 }

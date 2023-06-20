@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
+	"strings"
 )
 
 // main is the entry point of the application. It initializes necessary components, sets up HTTP routes, and starts the HTTP server.
@@ -35,7 +39,6 @@ func main() {
 
 // healthz is an HTTP handler that always returns an HTTP status of 200 and a response body of "Ok". It's commonly used for health checks.
 func healthz(w http.ResponseWriter, _ *http.Request) {
-	Logger.Debug("Healthz")
 	w.WriteHeader(http.StatusOK)
 	_, _ = fmt.Fprint(w, "Ok")
 }
@@ -53,13 +56,34 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	var upstreamUrl *url.URL
 	var enforceFunc func(string, map[string]bool) (string, error)
 	var tenantLabels map[string]bool
-	query := req.URL.Query().Get("query")
+	var err error
+
+	urlKey := "query"
+	if containsApiV1Labels(req.URL.Path) {
+		urlKey = "match[]"
+	}
+	query := req.URL.Query().Get(urlKey)
+
+	upstreamUrl, err = url.Parse(Cfg.Proxy.ThanosUrl)
+	enforceFunc = promqlEnforcer
+	Logger.Debug("Parsed Thanos URL")
+
+	if containsLoki(req.URL.Path) {
+		upstreamUrl, err = url.Parse(Cfg.Proxy.LokiUrl)
+		enforceFunc = logqlEnforcer
+		Logger.Debug("Parsed Loki URL")
+	}
+
+	if err != nil {
+		logAndWriteErrorMsg(rw, "Error parsing upstream url", http.StatusInternalServerError, err)
+		return
+	}
 
 	logRequest(req)
 	Logger.Debug("url request", zap.String("url", req.URL.String()))
 
 	if !hasAuthorizationHeader(req) {
-		logAndWriteError(rw, "No Authorization header found", http.StatusForbidden, nil)
+		logAndWriteErrorMsg(rw, "No Authorization header found", http.StatusForbidden, nil)
 		return
 	}
 
@@ -68,44 +92,18 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	tokenString := getBearerToken(req)
 	keycloakToken, token, err := parseJwtToken(tokenString)
 	if err != nil && !Cfg.Dev.Enabled {
-		logAndWriteError(rw, "Error parsing Keycloak token", http.StatusForbidden, err)
+		logAndWriteErrorMsg(rw, "Error parsing Keycloak token", http.StatusForbidden, err)
 		return
 	}
 
 	Logger.Debug("Parsed JWT token")
 
 	if !isValidToken(token) {
-		logAndWriteError(rw, "Invalid token", http.StatusForbidden, nil)
+		logAndWriteErrorMsg(rw, "Invalid token", http.StatusForbidden, nil)
 		return
 	}
 
 	Logger.Debug("Token is valid")
-
-	if req.Header.Get("X-Plugin-Id") != "thanos" && req.Header.Get("X-Plugin-Id") != "loki" {
-		logAndWriteError(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
-		return
-	}
-
-	Logger.Debug("Has X-Plugin-Id")
-
-	if req.Header.Get("X-Plugin-Id") == "thanos" {
-		upstreamUrl, err = url.Parse(Cfg.Proxy.ThanosUrl)
-		enforceFunc = promqlEnforcer
-		Logger.Debug("Parsed Thanos URL")
-	}
-
-	if req.Header.Get("X-Plugin-Id") == "loki" {
-		upstreamUrl, err = url.Parse(Cfg.Proxy.LokiUrl)
-		enforceFunc = logqlEnforcer
-		Logger.Debug("Parsed Loki URL")
-	}
-
-	if err != nil {
-		logAndWriteError(rw, "Error parsing upstream url", http.StatusForbidden, err)
-		return
-	}
-
-	Logger.Debug("No error in parsing URLs")
 
 	if isAdminSkip(keycloakToken) {
 		goto DoRequest
@@ -126,37 +124,57 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		tenantLabels = GetLabelsCM(keycloakToken.PreferredUsername, keycloakToken.Groups)
 		Logger.Debug("Fetched labels from ConfigMap")
 	default:
-		logAndWriteError(rw, "No provider set", http.StatusForbidden, nil)
+		logAndWriteErrorMsg(rw, "No provider set", http.StatusForbidden, nil)
 		return
 	}
 
 	Logger.Debug("username", zap.String("username", keycloakToken.PreferredUsername))
 
 	if len(tenantLabels) <= 0 {
-		logAndWriteError(rw, "No tenant labels found", http.StatusForbidden, nil)
+		logAndWriteErrorMsg(rw, "No tenant labels found", http.StatusForbidden, nil)
 		return
 	}
 	Logger.Debug("Labels", zap.Any("tenantLabels", tenantLabels))
 
 	query, err = enforceFunc(query, tenantLabels)
 	if err != nil {
-		logAndWriteError(rw, "Error modifying query", http.StatusForbidden, err)
+		logAndWriteError(rw, http.StatusForbidden, err)
 		return
+	}
+	if req.Method == http.MethodPost {
+		if err := req.ParseForm(); err != nil {
+			logAndWriteErrorMsg(rw, "Error processing Post request", http.StatusForbidden, err)
+			return
+		}
+		Logger.Debug("Parsed form", zap.Any("form", req.PostForm))
+		body := req.PostForm
+		query, err = enforceFunc(body.Get(urlKey), tenantLabels)
+		if err != nil {
+			logAndWriteError(rw, http.StatusForbidden, err)
+			return
+		}
+		body.Set(urlKey, query)
+
+		// We are replacing request body, close previous one (ParseForm ensures it is read fully and not nil).
+		_ = req.Body.Close()
+		newBody := body.Encode()
+		req.Body = io.NopCloser(strings.NewReader(newBody))
+		req.ContentLength = int64(len(newBody))
 	}
 
 	Logger.Debug("Modified query successfully")
 
 DoRequest:
 
-	Logger.Debug("Doing request")
-
 	values := req.URL.Query()
-	values.Set("query", query)
+	values.Set(urlKey, query)
 	req.URL.RawQuery = values.Encode()
 	Logger.Debug("Set query")
 
+	Logger.Debug("Doing request")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", ServiceAccountToken))
 	Logger.Debug("Set Authorization header")
+	logRequest(req)
 
 	proxy := httputil.NewSingleHostReverseProxy(upstreamUrl)
 	proxy.ServeHTTP(rw, req)
@@ -184,20 +202,70 @@ func isAdminSkip(token KeycloakToken) bool {
 	return ContainsIgnoreCase(token.Groups, Cfg.Proxy.AdminGroup) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Proxy.AdminGroup)
 }
 
-// logAndWriteError logs an error and sends an error message as the HTTP response.
-func logAndWriteError(rw http.ResponseWriter, message string, statusCode int, err error) {
+func containsApiV1Labels(s string) bool {
+	return strings.Contains(s, "/api/v1/label") || strings.Contains(s, "/api/v1/series")
+}
+
+func containsLoki(s string) bool {
+	return strings.Contains(s, "/loki")
+}
+
+// logAndWriteErrorMsg logs an error and sends an error message as the HTTP response.
+func logAndWriteErrorMsg(rw http.ResponseWriter, message string, statusCode int, err error) {
 	Logger.Error(message, zap.Error(err))
 	rw.WriteHeader(statusCode)
 	_, _ = fmt.Fprint(rw, message+"\n")
 }
 
+// logAndWriteError logs an error and sends an error message as the HTTP response.
+func logAndWriteError(rw http.ResponseWriter, statusCode int, err error) {
+	Logger.Error(err.Error(), zap.Error(err))
+	rw.WriteHeader(statusCode)
+	_, _ = fmt.Fprint(rw, err.Error()+"\n")
+}
+
 // logRequest logs the details of an incoming HTTP request.
 func logRequest(req *http.Request) {
-	dump, err := httputil.DumpRequest(req, true)
-	if err != nil {
-		Logger.Error("Error while dumping request", zap.Error(err))
+	var bodyBytes []byte
+	if req.Body != nil {
+		bodyBytes, _ = io.ReadAll(req.Body)
 	}
-	Logger.Debug("Request", zap.String("request", string(dump)))
+
+	// Restore the io.ReadCloser to its original state
+	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	if !Cfg.Proxy.LogTokens {
+		bodyBytes = []byte("[REDACTED]")
+	}
+
+	requestData := struct {
+		Method string      `json:"method"`
+		URL    string      `json:"url"`
+		Header http.Header `json:"header"`
+		Body   string      `json:"body"`
+	}{
+		Method: req.Method,
+		URL:    req.URL.String(),
+		Header: req.Header,
+		Body:   string(bodyBytes),
+	}
+
+	if !Cfg.Proxy.LogTokens {
+		// Make a copy of the header map so we're not modifying the original
+		copyHeader := make(http.Header)
+		for k, v := range requestData.Header {
+			copyHeader[k] = v
+		}
+		copyHeader.Del("Authorization")
+		copyHeader.Del("X-Plugin-Id")
+		requestData.Header = copyHeader
+	}
+
+	jsonData, err := json.Marshal(requestData)
+	if err != nil {
+		Logger.Error("Error while marshalling request", zap.Error(err))
+		return
+	}
+	Logger.Debug("Request", zap.String("request", string(jsonData)))
 }
 
 // parseJwtToken parses a JWT token string into a Keycloak token and a JWT token. It returns an error if parsing fails.
