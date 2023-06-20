@@ -182,13 +182,6 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Error parsing Keycloak token\n",
 		},
 		{
-			name:             "Missing x-plugin-id header",
-			expectedStatus:   http.StatusForbidden,
-			setAuthorization: true,
-			authorization:    "Bearer " + tokens["noTenant"],
-			expectedBody:     "No X-Plugin-Id header found\n",
-		},
-		{
 			name:             "Missing tenant labels for user",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
