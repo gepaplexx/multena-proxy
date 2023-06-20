@@ -176,6 +176,10 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		Logger.Debug("Parsed form", zap.Any("form", req.PostForm))
 		body := req.PostForm
 		query, err = enforceFunc(body.Get(urlKey), tenantLabels)
+		if err != nil {
+			logAndWriteError(rw, http.StatusForbidden, err)
+			return
+		}
 		body.Set(urlKey, query)
 
 		// We are replacing request body, close previous one (ParseForm ensures it is read fully and not nil).
