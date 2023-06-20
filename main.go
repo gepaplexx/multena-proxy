@@ -39,7 +39,6 @@ func main() {
 
 // healthz is an HTTP handler that always returns an HTTP status of 200 and a response body of "Ok". It's commonly used for health checks.
 func healthz(w http.ResponseWriter, _ *http.Request) {
-	Logger.Debug("Healthz")
 	w.WriteHeader(http.StatusOK)
 	_, _ = fmt.Fprint(w, "Ok")
 }
@@ -105,34 +104,6 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	Logger.Debug("Token is valid")
-
-	if Cfg.Proxy.UsePluginToken &&
-		req.Header.Get("X-Plugin-Id") != "thanos" &&
-		req.Header.Get("X-Plugin-Id") != "loki" {
-		logAndWriteErrorMsg(rw, "No X-Plugin-Id header found", http.StatusForbidden, nil)
-		return
-	}
-
-	Logger.Debug("Has X-Plugin-Id")
-
-	if req.Header.Get("X-Plugin-Id") == "thanos" {
-		upstreamUrl, err = url.Parse(Cfg.Proxy.ThanosUrl)
-		enforceFunc = promqlEnforcer
-		Logger.Debug("Parsed Thanos URL")
-	}
-
-	if req.Header.Get("X-Plugin-Id") == "loki" {
-		upstreamUrl, err = url.Parse(Cfg.Proxy.LokiUrl)
-		enforceFunc = logqlEnforcer
-		Logger.Debug("Parsed Loki URL")
-	}
-
-	if err != nil {
-		logAndWriteErrorMsg(rw, "Error parsing upstream url", http.StatusForbidden, err)
-		return
-	}
-
-	Logger.Debug("No error in parsing URLs")
 
 	if isAdminSkip(keycloakToken) {
 		goto DoRequest
@@ -262,6 +233,9 @@ func logRequest(req *http.Request) {
 
 	// Restore the io.ReadCloser to its original state
 	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	if !Cfg.Proxy.LogTokens {
+		bodyBytes = []byte("[REDACTED]")
+	}
 
 	requestData := struct {
 		Method string      `json:"method"`

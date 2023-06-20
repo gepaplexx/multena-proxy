@@ -17,7 +17,6 @@ type Config struct {
 		AdminGroup         string `mapstructure:"admin_group"`
 		InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
 		LogTokens          bool   `mapstructure:"log_tokens"`
-		UsePluginToken     bool   `mapstructure:"use_plugin_token"`
 		Port               int    `mapstructure:"port"`
 		Host               string `mapstructure:"host"`
 		TenantLabels       struct {
