@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2-691
 RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
 WORKDIR /app/
 COPY multena-proxy .
