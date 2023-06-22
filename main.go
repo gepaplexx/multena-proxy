@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
+	"github.com/slok/go-http-metrics/middleware"
+	"github.com/slok/go-http-metrics/middleware/std"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -27,11 +31,24 @@ func main() {
 
 	Logger.Info("Starting Proxy")
 
+	mdlw := middleware.New(middleware.Config{
+		Recorder: metrics.NewRecorder(metrics.Config{}),
+		Service:  "multena",
+	})
+
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/healthz", http.HandlerFunc(healthz))
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	mux.Handle("/", http.HandlerFunc(reverseProxy))
-	err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Proxy.Host, Cfg.Proxy.Port), mux)
+
+	go func() {
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Proxy.Host, Cfg.Proxy.Port+1), mux); err != nil {
+			Logger.Panic("Error while serving metrics", zap.Error(err))
+		}
+	}()
+	err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Proxy.Host, Cfg.Proxy.Port),
+		std.Handler("/", mdlw, http.HandlerFunc(reverseProxy)))
+
 	if err != nil {
 		Logger.Panic("Error while serving", zap.Error(err))
 	}
@@ -163,13 +180,14 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	Logger.Debug("Modified query successfully")
+	{
+		values := req.URL.Query()
+		values.Set(urlKey, query)
+		req.URL.RawQuery = values.Encode()
+		Logger.Debug("Set query")
+	}
 
 DoRequest:
-
-	values := req.URL.Query()
-	values.Set(urlKey, query)
-	req.URL.RawQuery = values.Encode()
-	Logger.Debug("Set query")
 
 	Logger.Debug("Doing request")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", ServiceAccountToken))

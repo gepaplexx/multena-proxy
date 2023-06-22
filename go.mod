@@ -9,7 +9,9 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/observatorium/api v0.1.3-0.20230616023935-684eb1bb4a45
 	github.com/prometheus-community/prom-label-proxy v0.7.0
+	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/prometheus v0.44.0
+	github.com/slok/go-http-metrics v0.10.0
 	github.com/spf13/viper v1.16.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.24.0
@@ -22,7 +24,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/efficientgo/core v1.0.0-rc.2 // indirect
-	github.com/efficientgo/tools/core v0.0.0-20220225185207-fe763185946b // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
@@ -53,10 +54,9 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/alertmanager v0.25.0 // indirect
-	github.com/prometheus/client_golang v1.15.1 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
-	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
