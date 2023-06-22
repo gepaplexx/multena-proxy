@@ -180,13 +180,14 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	Logger.Debug("Modified query successfully")
+	{
+		values := req.URL.Query()
+		values.Set(urlKey, query)
+		req.URL.RawQuery = values.Encode()
+		Logger.Debug("Set query")
+	}
 
 DoRequest:
-
-	values := req.URL.Query()
-	values.Set(urlKey, query)
-	req.URL.RawQuery = values.Encode()
-	Logger.Debug("Set query")
 
 	Logger.Debug("Doing request")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", ServiceAccountToken))
