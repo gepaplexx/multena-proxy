@@ -42,7 +42,7 @@ func main() {
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
 
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Proxy.Host, Cfg.Proxy.Port+1), mux); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Proxy.Host, Cfg.Proxy.MetricsPort), mux); err != nil {
 			Logger.Panic("Error while serving metrics", zap.Error(err))
 		}
 	}()
