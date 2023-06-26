@@ -18,6 +18,7 @@ type Config struct {
 		InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
 		LogTokens          bool   `mapstructure:"log_tokens"`
 		Port               int    `mapstructure:"port"`
+		MetricsPort        int    `mapstructure:"metrics_port"`
 		Host               string `mapstructure:"host"`
 		TenantLabels       struct {
 			Thanos string `mapstructure:"thanos"`

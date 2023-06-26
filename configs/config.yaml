@@ -8,6 +8,7 @@ proxy:
   insecure_skip_verify: false
   log_tokens: false
   port: 8080
+  metrics_port: 8081
   host: localhost
   tenant_labels:
     thanos: namespace
