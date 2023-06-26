@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -37,6 +39,7 @@ func init() {
 	Logger.Info("Commit: ", zap.String("commit", Commit))
 	Logger.Info("Set http client to ignore self signed certificates")
 	Logger.Info("Config ", zap.Any("cfg", Cfg))
+	InitTLSConfig()
 	ServiceAccountToken = Cfg.Dev.ServiceAccountToken
 	if !strings.HasSuffix(os.Args[0], ".test") {
 		Logger.Debug("Not in test mode")
@@ -53,10 +56,6 @@ func init() {
 
 	if Cfg.Db.Enabled {
 		InitDB()
-	}
-
-	if Cfg.Proxy.InsecureSkipVerify {
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 	Logger.Info("------Init Complete------")
 }
@@ -135,6 +134,32 @@ func InitLogging() *zap.Logger {
 	Logger.Debug("Go OS/Arch", zap.String("os", runtime.GOOS), zap.String("arch", runtime.GOARCH))
 	Logger.Debug("Config", zap.Any("cfg", Cfg))
 	return Logger
+}
+
+func InitTLSConfig() {
+	rootCAs, _ := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+
+	if Cfg.Proxy.TrustedCAPath != "" {
+		files, err := os.ReadDir(Cfg.Proxy.TrustedCAPath)
+		if err != nil {
+			Logger.Error("Error while reading directory", zap.Error(err))
+		}
+		for _, file := range files {
+			certs, err := os.ReadFile(filepath.Join(Cfg.Proxy.TrustedCAPath, file.Name()))
+			if err != nil {
+				Logger.Error("Error while reading trusted CA", zap.Error(err))
+			}
+			rootCAs.AppendCertsFromPEM(certs)
+		}
+	}
+	config := &tls.Config{
+		InsecureSkipVerify: Cfg.Proxy.InsecureSkipVerify,
+		RootCAs:            rootCAs,
+	}
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = config
 }
 
 // InitJWKS initializes the JWKS (JSON Web Key Set) from a specified URL. It sets up the refresh parameters

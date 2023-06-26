@@ -16,6 +16,7 @@ type Config struct {
 		JwksCertURL        string `mapstructure:"jwks_cert_url"`
 		AdminGroup         string `mapstructure:"admin_group"`
 		InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
+		TrustedCAPath      string `mapstructure:"trusted_ca_path"`
 		LogTokens          bool   `mapstructure:"log_tokens"`
 		Port               int    `mapstructure:"port"`
 		MetricsPort        int    `mapstructure:"metrics_port"`
