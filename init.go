@@ -87,6 +87,8 @@ func onConfigChange(e fsnotify.Event) {
 	}
 	fmt.Printf("{\"level\":\"info\",\"config\":\"%+v/\"}", Cfg)
 	fmt.Printf("{\"level\":\"info\",\"message\":\"Config file changed: %s/\"}", e.Name)
+	InitTLSConfig()
+	InitJWKS()
 }
 
 // loadConfig loads the configuration from the specified file. It looks for the config file
@@ -148,6 +150,9 @@ func InitTLSConfig() {
 			Logger.Error("Error while reading directory", zap.Error(err))
 		}
 		for _, file := range files {
+			if strings.Contains(file.Name(), "..") {
+				continue
+			}
 			certs, err := os.ReadFile(filepath.Join(Cfg.Proxy.TrustedCAPath, file.Name()))
 			if err != nil {
 				Logger.Error("Error while reading trusted CA", zap.Error(err))
