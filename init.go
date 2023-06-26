@@ -39,7 +39,7 @@ func init() {
 	Logger.Info("Config ", zap.Any("cfg", Cfg))
 	ServiceAccountToken = Cfg.Dev.ServiceAccountToken
 	if !strings.HasSuffix(os.Args[0], ".test") {
-		fmt.Println("Not in test mode")
+		Logger.Debug("Not in test mode")
 		InitJWKS()
 		if !Cfg.Dev.Enabled {
 			sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
