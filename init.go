@@ -66,7 +66,9 @@ func InitConfig() {
 	Cfg = &Config{}
 	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
 	loadConfig("config")
-	loadConfig("labels")
+	if Cfg.Proxy.Provider == "configmap" {
+		loadConfig("labels")
+	}
 }
 
 // onConfigChange is a callback that gets triggered when a configuration file changes.
@@ -74,7 +76,13 @@ func InitConfig() {
 func onConfigChange(e fsnotify.Event) {
 	//Todo: change log level on reload
 	Cfg = &Config{}
-	configs := []string{"config", "labels"}
+	var configs []string
+	if Cfg.Proxy.Provider == "configmap" {
+		configs = []string{"config", "labels"}
+	} else {
+		configs = []string{"config"}
+	}
+
 	for _, name := range configs {
 		V.SetConfigName(name) // name of config file (without extension)
 		err := V.MergeInConfig()
