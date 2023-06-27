@@ -166,6 +166,7 @@ func InitTLSConfig() {
 				Logger.Error("Error while reading trusted CA", zap.Error(err))
 				return err
 			}
+			Logger.Debug("Adding trusted CA", zap.String("path", path))
 			rootCAs.AppendCertsFromPEM(certs)
 
 			return nil
