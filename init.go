@@ -153,25 +153,34 @@ func InitTLSConfig() {
 	}
 
 	if Cfg.Proxy.TrustedCAPath != "" {
-		files, err := os.ReadDir(Cfg.Proxy.TrustedCAPath)
-		if err != nil {
-			Logger.Error("Error while reading directory", zap.Error(err))
-		}
-		for _, file := range files {
-			if strings.Contains(file.Name(), "..") {
-				continue
+		err := filepath.Walk(Cfg.Proxy.TrustedCAPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
 			}
-			certs, err := os.ReadFile(filepath.Join(Cfg.Proxy.TrustedCAPath, file.Name()))
+			if info.IsDir() || strings.Contains(info.Name(), "..") {
+				return nil
+			}
+
+			certs, err := os.ReadFile(path)
 			if err != nil {
 				Logger.Error("Error while reading trusted CA", zap.Error(err))
+				return err
 			}
 			rootCAs.AppendCertsFromPEM(certs)
+
+			return nil
+		})
+
+		if err != nil {
+			Logger.Error("Error while traversing directory", zap.Error(err))
 		}
 	}
+
 	config := &tls.Config{
 		InsecureSkipVerify: Cfg.Proxy.InsecureSkipVerify,
 		RootCAs:            rootCAs,
 	}
+
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = config
 }
 
