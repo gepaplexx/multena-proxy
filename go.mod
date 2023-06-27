@@ -7,7 +7,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang-jwt/jwt/v5 v5.0.0
-	github.com/observatorium/api v0.1.3-0.20230616023935-684eb1bb4a45
+	github.com/observatorium/api v0.1.3-0.20230619071616-b6adb8453744
 	github.com/prometheus-community/prom-label-proxy v0.7.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/prometheus v0.45.0
