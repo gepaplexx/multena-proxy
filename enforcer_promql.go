@@ -23,7 +23,7 @@ func promqlEnforcer(query string, allowedTenantLabels map[string]bool) (string, 
 			operator = "=~"
 		}
 		query = fmt.Sprintf("{%s%s\"%s\"}",
-			Cfg.Proxy.TenantLabels.Thanos,
+			Cfg.Thanos.TenantLabel,
 			operator,
 			strings.Join(MapKeysToArray(allowedTenantLabels),
 				"|"))
@@ -94,7 +94,7 @@ func extractLabelsAndValues(expr parser.Expr) (map[string]string, error) {
 // against allowed tenant labels. If the check fails, it returns an error. If no label matches
 // the Thanos tenant label, it returns all allowed tenant labels.
 func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool) ([]string, error) {
-	if _, ok := queryLabels[Cfg.Proxy.TenantLabels.Thanos]; ok {
+	if _, ok := queryLabels[Cfg.Thanos.TenantLabel]; ok {
 		ok, tenantLabels := checkLabels(queryLabels, allowedTenantLabels)
 		if !ok {
 			return nil, fmt.Errorf("user not allowed with namespace %s", tenantLabels[0])
@@ -109,7 +109,7 @@ func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string
 // in allowed tenant labels, it returns false along with the query label. If all query labels exist
 // in allowed tenant labels, it returns true along with the query labels.
 func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool) (bool, []string) {
-	splitQueryLabels := strings.Split(queryLabels[Cfg.Proxy.TenantLabels.Thanos], "|")
+	splitQueryLabels := strings.Split(queryLabels[Cfg.Thanos.TenantLabel], "|")
 	for _, queryLabel := range splitQueryLabels {
 		_, ok := allowedTenantLabels[queryLabel]
 		if !ok {
@@ -132,7 +132,7 @@ func createEnforcer(tenantLabels []string) *enforcer.Enforcer {
 	}
 
 	return enforcer.NewEnforcer(true, &labels.Matcher{
-		Name:  Cfg.Proxy.TenantLabels.Thanos,
+		Name:  Cfg.Thanos.TenantLabel,
 		Type:  matchType,
 		Value: strings.Join(tenantLabels, "|"),
 	})

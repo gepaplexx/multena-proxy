@@ -3,38 +3,56 @@ package main
 import "github.com/golang-jwt/jwt/v5"
 
 type Config struct {
+	Log struct {
+		Level     string `mapstructure:"level"`
+		LogTokens bool   `mapstructure:"log_tokens"`
+	} `mapstructure:"log"`
+
+	TenantProvider string `mapstructure:"tenant_provider"`
+
+	Web struct {
+		ProxyPort          int    `mapstructure:"proxy_port"`
+		MetricsPort        int    `mapstructure:"metrics_port"`
+		Host               string `mapstructure:"host"`
+		InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
+		TrustedRootCaPath  string `mapstructure:"trusted_root_ca_path"`
+		JwksCertURL        string `mapstructure:"jwks_cert_url"`
+	} `mapstructure:"web"`
+
+	Admin struct {
+		Bypass bool   `mapstructure:"bypass"`
+		Group  string `mapstructure:"group"`
+	} `mapstructure:"admin"`
+
 	Dev struct {
 		Enabled             bool   `mapstructure:"enabled"`
 		Username            string `mapstructure:"username"`
 		ServiceAccountToken string `mapstructure:"service_account_token"`
 	} `mapstructure:"dev"`
-	Proxy struct {
-		LogLevel           string `mapstructure:"log_level"`
-		Provider           string `mapstructure:"provider"`
-		ThanosUrl          string `mapstructure:"thanos_url"`
-		LokiUrl            string `mapstructure:"loki_url"`
-		JwksCertURL        string `mapstructure:"jwks_cert_url"`
-		AdminGroup         string `mapstructure:"admin_group"`
-		InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
-		TrustedCAPath      string `mapstructure:"trusted_ca_path"`
-		LogTokens          bool   `mapstructure:"log_tokens"`
-		Port               int    `mapstructure:"port"`
-		MetricsPort        int    `mapstructure:"metrics_port"`
-		Host               string `mapstructure:"host"`
-		TenantLabels       struct {
-			Thanos string `mapstructure:"thanos"`
-			Loki   string `mapstructure:"loki"`
-		} `mapstructure:"tenant_labels"`
-	} `mapstructure:"proxy"`
+
 	Db struct {
 		Enabled      bool   `mapstructure:"enabled"`
 		User         string `mapstructure:"user"`
 		PasswordPath string `mapstructure:"password_path"`
 		Host         string `mapstructure:"host"`
 		Port         int    `mapstructure:"port"`
-		DbName       string `mapstructure:"db_name"`
+		DbName       string `mapstructure:"dbName"`
 		Query        string `mapstructure:"query"`
 	} `mapstructure:"db"`
+
+	Thanos struct {
+		URL         string `mapstructure:"url"`
+		TenantLabel string `mapstructure:"tenant_label"`
+		Cert        string `mapstructure:"cert"`
+		Key         string `mapstructure:"key"`
+	} `mapstructure:"thanos"`
+	Loki struct {
+		URL         string `mapstructure:"url"`
+		TenantLabel string `mapstructure:"tenant_label"`
+		Cert        string `mapstructure:"cert"`
+		Key         string `mapstructure:"key"`
+	} `mapstructure:"loki"`
+
 	Users  map[string][]string `mapstructure:"users"`
 	Groups map[string][]string `mapstructure:"groups"`
 }

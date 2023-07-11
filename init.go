@@ -51,7 +51,6 @@ func init() {
 			}
 			ServiceAccountToken = string(sa)
 		}
-
 	}
 
 	if Cfg.Db.Enabled {
@@ -65,7 +64,7 @@ func InitConfig() {
 	Cfg = &Config{}
 	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
 	loadConfig("config")
-	if Cfg.Proxy.Provider == "configmap" {
+	if Cfg.TenantProvider == "configmap" {
 		loadConfig("labels")
 	}
 }
@@ -76,7 +75,7 @@ func onConfigChange(e fsnotify.Event) {
 	//Todo: change log level on reload
 	Cfg = &Config{}
 	var configs []string
-	if Cfg.Proxy.Provider == "configmap" {
+	if Cfg.TenantProvider == "configmap" {
 		configs = []string{"config", "labels"}
 	} else {
 		configs = []string{"config"}
@@ -122,7 +121,7 @@ func loadConfig(configName string) {
 // InitLogging initializes the logger based on the log level specified in the config file.
 func InitLogging() *zap.Logger {
 	rawJSON := []byte(`{
-		"level": "` + strings.ToLower(Cfg.Proxy.LogLevel) + `",
+		"level": "` + strings.ToLower(Cfg.Log.Level) + `",
 		"encoding": "json",
 		"outputPaths": ["stdout"],
 		"errorOutputPaths": ["stdout"],
@@ -152,8 +151,8 @@ func InitTLSConfig() {
 		rootCAs = x509.NewCertPool()
 	}
 
-	if Cfg.Proxy.TrustedCAPath != "" {
-		err := filepath.Walk(Cfg.Proxy.TrustedCAPath, func(path string, info os.FileInfo, err error) error {
+	if Cfg.Web.TrustedRootCaPath != "" {
+		err := filepath.Walk(Cfg.Web.TrustedRootCaPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -167,6 +166,7 @@ func InitTLSConfig() {
 				return err
 			}
 			Logger.Debug("Adding trusted CA", zap.String("path", path))
+			certs = append(certs, []byte("\n")...)
 			rootCAs.AppendCertsFromPEM(certs)
 
 			return nil
@@ -177,9 +177,26 @@ func InitTLSConfig() {
 		}
 	}
 
+	var certificates []tls.Certificate
+
+	lokiCert, err := tls.LoadX509KeyPair(Cfg.Loki.Cert, Cfg.Loki.Key)
+	if err != nil {
+		Logger.Error("Error while loading certificate", zap.Error(err))
+	} else {
+		certificates = append(certificates, lokiCert)
+	}
+
+	thanosCert, err := tls.LoadX509KeyPair(Cfg.Thanos.Cert, Cfg.Thanos.Key)
+	if err != nil {
+		Logger.Error("Error while loading certificate", zap.Error(err))
+	} else {
+		certificates = append(certificates, thanosCert)
+	}
+
 	config := &tls.Config{
-		InsecureSkipVerify: Cfg.Proxy.InsecureSkipVerify,
+		InsecureSkipVerify: Cfg.Web.InsecureSkipVerify,
 		RootCAs:            rootCAs,
+		Certificates:       certificates,
 	}
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = config
@@ -189,7 +206,7 @@ func InitTLSConfig() {
 // for the JWKS and handles any errors that occur during the refresh.
 func InitJWKS() {
 	Logger.Info("Init Keycloak config")
-	jwksURL := Cfg.Proxy.JwksCertURL
+	jwksURL := Cfg.Web.JwksCertURL
 
 	options := keyfunc.Options{
 		RefreshErrorHandler: func(err error) {

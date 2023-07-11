@@ -120,7 +120,7 @@ func setupTestMain() map[string]string {
 		}
 	}))
 	//defer jwksServer.Close()
-	Cfg.Proxy.JwksCertURL = jwksServer.URL
+	Cfg.Web.JwksCertURL = jwksServer.URL
 	InitJWKS()
 
 	// Set up the upstream server
@@ -131,10 +131,10 @@ func setupTestMain() map[string]string {
 		}
 	}))
 	//defer upstreamServer.Close()
-	Cfg.Proxy.ThanosUrl = upstreamServer.URL
-	Cfg.Proxy.LokiUrl = upstreamServer.URL
-	Cfg.Proxy.TenantLabels.Loki = "tenant_id"
-	Cfg.Proxy.TenantLabels.Thanos = "tenant_id"
+	Cfg.Thanos.URL = upstreamServer.URL
+	Cfg.Loki.URL = upstreamServer.URL
+	Cfg.Thanos.TenantLabel = "tenant_id"
+	Cfg.Loki.TenantLabel = "tenant_id"
 
 	Cfg.Users["user"] = []string{"allowed_user", "also_allowed_user"}
 	Cfg.Groups["group1"] = []string{"allowed_group1", "also_allowed_group1"}

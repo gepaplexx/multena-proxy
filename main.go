@@ -42,11 +42,11 @@ func main() {
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
 
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Proxy.Host, Cfg.Proxy.MetricsPort), mux); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Web.Host, Cfg.Web.MetricsPort), mux); err != nil {
 			Logger.Panic("Error while serving metrics", zap.Error(err))
 		}
 	}()
-	err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Proxy.Host, Cfg.Proxy.Port),
+	err := http.ListenAndServe(fmt.Sprintf("%s:%d", Cfg.Web.Host, Cfg.Web.ProxyPort),
 		std.Handler("/", mdlw, http.HandlerFunc(reverseProxy)))
 
 	if err != nil {
@@ -81,12 +81,12 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}
 	query := req.URL.Query().Get(urlKey)
 
-	upstreamUrl, err = url.Parse(Cfg.Proxy.ThanosUrl)
+	upstreamUrl, err = url.Parse(Cfg.Thanos.URL)
 	enforceFunc = promqlEnforcer
 	Logger.Debug("Parsed Thanos URL")
 
 	if containsLoki(req.URL.Path) {
-		upstreamUrl, err = url.Parse(Cfg.Proxy.LokiUrl)
+		upstreamUrl, err = url.Parse(Cfg.Loki.URL)
 		enforceFunc = logqlEnforcer
 		Logger.Debug("Parsed Loki URL")
 	}
@@ -133,7 +133,7 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 		Logger.Debug("Development mode enabled, set preferred username")
 	}
 
-	switch provider := Cfg.Proxy.Provider; provider {
+	switch provider := Cfg.TenantProvider; provider {
 	case "mysql":
 		tenantLabels = GetLabelsFromDB(keycloakToken.Email)
 		Logger.Debug("Fetched labels from MySQL")
@@ -217,7 +217,7 @@ func isValidToken(token *jwt.Token) bool {
 
 // isAdminSkip checks if a user belongs to the admin group. It can bypass some checks for admin users.
 func isAdminSkip(token KeycloakToken) bool {
-	return ContainsIgnoreCase(token.Groups, Cfg.Proxy.AdminGroup) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Proxy.AdminGroup)
+	return (ContainsIgnoreCase(token.Groups, Cfg.Admin.Group) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Admin.Group)) && Cfg.Admin.Bypass
 }
 
 func containsApiV1Labels(s string) bool {
@@ -251,7 +251,7 @@ func logRequest(req *http.Request) {
 
 	// Restore the io.ReadCloser to its original state
 	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	if !Cfg.Proxy.LogTokens {
+	if !Cfg.Log.LogTokens {
 		bodyBytes = []byte("[REDACTED]")
 	}
 
@@ -267,7 +267,7 @@ func logRequest(req *http.Request) {
 		Body:   string(bodyBytes),
 	}
 
-	if !Cfg.Proxy.LogTokens {
+	if !Cfg.Log.LogTokens {
 		// Make a copy of the header map so we're not modifying the original
 		copyHeader := make(http.Header)
 		for k, v := range requestData.Header {
