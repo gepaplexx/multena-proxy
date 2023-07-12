@@ -275,6 +275,7 @@ func logRequest(req *http.Request) {
 		}
 		copyHeader.Del("Authorization")
 		copyHeader.Del("X-Plugin-Id")
+		copyHeader.Del("X-Id-Token")
 		requestData.Header = copyHeader
 	}
 
