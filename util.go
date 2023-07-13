@@ -26,5 +26,5 @@ func MapKeysToArray[K comparable, V any](tenantLabel map[K]V) []K {
 }
 
 func teardown() {
-	InitConfig()
+	initConfig()
 }
