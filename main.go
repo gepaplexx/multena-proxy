@@ -268,7 +268,6 @@ func logRequest(req *http.Request) {
 	}
 
 	if !Cfg.Log.LogTokens {
-		// Make a copy of the header map so we're not modifying the original
 		copyHeader := make(http.Header)
 		for k, v := range requestData.Header {
 			copyHeader[k] = v
@@ -284,7 +283,7 @@ func logRequest(req *http.Request) {
 		Logger.Error("Error while marshalling request", zap.Error(err))
 		return
 	}
-	Logger.Debug("Request", zap.String("request", string(jsonData)))
+	Logger.Debug("Request", zap.String("request", string(jsonData)), zap.String("path", req.URL.Path))
 }
 
 // parseJwtToken parses a JWT token string into a Keycloak token and a JWT token. It returns an error if parsing fails.

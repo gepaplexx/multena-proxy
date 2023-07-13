@@ -181,7 +181,7 @@ func InitTLSConfig() {
 
 	lokiCert, err := tls.LoadX509KeyPair(Cfg.Loki.Cert, Cfg.Loki.Key)
 	if err != nil {
-		Logger.Error("Error while loading certificate", zap.Error(err))
+		Logger.Error("Error while loading loki certificate", zap.Error(err))
 	} else {
 		Logger.Debug("Adding Loki certificate", zap.String("path", Cfg.Loki.Cert))
 		certificates = append(certificates, lokiCert)
@@ -189,9 +189,9 @@ func InitTLSConfig() {
 
 	thanosCert, err := tls.LoadX509KeyPair(Cfg.Thanos.Cert, Cfg.Thanos.Key)
 	if err != nil {
-		Logger.Error("Error while loading certificate", zap.Error(err))
+		Logger.Error("Error while loading thanos certificate", zap.Error(err))
 	} else {
-		Logger.Debug("Adding Loki certificate", zap.String("path", Cfg.Loki.Cert))
+		Logger.Debug("Adding Thanos certificate", zap.String("path", Cfg.Loki.Cert))
 		certificates = append(certificates, thanosCert)
 	}
 
