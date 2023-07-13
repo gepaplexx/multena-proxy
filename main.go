@@ -97,7 +97,6 @@ func reverseProxy(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	logRequest(req)
-	Logger.Debug("url request", zap.String("url", req.URL.String()))
 
 	if !hasAuthorizationHeader(req) {
 		logAndWriteErrorMsg(rw, "No Authorization header found", http.StatusForbidden, nil)
