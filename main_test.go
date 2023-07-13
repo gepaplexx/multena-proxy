@@ -121,7 +121,7 @@ func setupTestMain() map[string]string {
 	}))
 	//defer jwksServer.Close()
 	Cfg.Web.JwksCertURL = jwksServer.URL
-	InitJWKS()
+	initJWKS()
 
 	// Set up the upstream server
 	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
