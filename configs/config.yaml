@@ -1,26 +1,43 @@
-proxy:
-  log_level: INFO
-  provider: configmap
-  thanos_url: https://localhost:3000
-  loki_url: https://localhost:3000
-  jwks_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs
-  admin_group: gepardec-run-admins
-  insecure_skip_verify: false
+log:
+  level: DEBUG
   log_tokens: false
-  port: 8080
+
+tenant_provider: configmap
+
+web:
+  proxy_port: 8080
   metrics_port: 8081
   host: localhost
-  tenant_labels:
-    thanos: namespace
-    loki: kubernetes_namespace_name
+  insecure_skip_verify: true
+  trusted_root_ca_path: "./certs/"
+  jwks_cert_url: https://example.com/realms/internal/protocol/openid-connect/certs
+
+admin:
+  bypass: true
+  group: gepardec-run-admins
+
+dev:
+  enabled: false
+  username: example
+  service_account_token: "fake"
+
 db:
+  enabled: false
   user: multitenant
   password_path: "."
   host: localhost
   port: 3306
   dbName: example
   query: "SELECT * FROM users WHERE username = ?"
-dev:
-  enabled: false
-  username: example
-  service_account_token: "fake"
+
+thanos:
+  url: https://localhost:9091
+  tenant_label: namespace
+  cert: "./certs/thanos/tls.crt"
+  key: "./certs/thanos/tls.key"
+
+loki:
+  url: https://localhost:3100
+  tenant_label: kubernetes_namespace_name
+  cert: "./certs/loki/tls.crt"
+  key: "./certs/loki/tls.key"

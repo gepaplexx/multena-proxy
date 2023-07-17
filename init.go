@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -31,16 +33,17 @@ var (
 // configures the HTTP client to ignore self-signed certificates, reads the service account token,
 // initializes JWKS if not in development mode, and establishes a database connection if enabled in the config.
 func init() {
-	InitConfig()
-	InitLogging()
+	initConfig()
+	initLogging()
 	Logger.Info("-------Init Proxy-------")
 	Logger.Info("Commit: ", zap.String("commit", Commit))
 	Logger.Info("Set http client to ignore self signed certificates")
 	Logger.Info("Config ", zap.Any("cfg", Cfg))
+	initTLSConfig()
 	ServiceAccountToken = Cfg.Dev.ServiceAccountToken
 	if !strings.HasSuffix(os.Args[0], ".test") {
 		Logger.Debug("Not in test mode")
-		InitJWKS()
+		initJWKS()
 		if !Cfg.Dev.Enabled {
 			sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
 			if err != nil {
@@ -48,25 +51,20 @@ func init() {
 			}
 			ServiceAccountToken = string(sa)
 		}
-
 	}
 
 	if Cfg.Db.Enabled {
-		InitDB()
-	}
-
-	if Cfg.Proxy.InsecureSkipVerify {
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		initDB()
 	}
 	Logger.Info("------Init Complete------")
 }
 
-// InitConfig initializes the configuration from the files `config` and `labels` using Viper.
-func InitConfig() {
+// initConfig initializes the configuration from the files `config` and `labels` using Viper.
+func initConfig() {
 	Cfg = &Config{}
 	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
 	loadConfig("config")
-	if Cfg.Proxy.Provider == "configmap" {
+	if Cfg.TenantProvider == "configmap" {
 		loadConfig("labels")
 	}
 }
@@ -77,7 +75,7 @@ func onConfigChange(e fsnotify.Event) {
 	//Todo: change log level on reload
 	Cfg = &Config{}
 	var configs []string
-	if Cfg.Proxy.Provider == "configmap" {
+	if Cfg.TenantProvider == "configmap" {
 		configs = []string{"config", "labels"}
 	} else {
 		configs = []string{"config"}
@@ -96,6 +94,8 @@ func onConfigChange(e fsnotify.Event) {
 	}
 	fmt.Printf("{\"level\":\"info\",\"config\":\"%+v/\"}", Cfg)
 	fmt.Printf("{\"level\":\"info\",\"message\":\"Config file changed: %s/\"}", e.Name)
+	initTLSConfig()
+	initJWKS()
 }
 
 // loadConfig loads the configuration from the specified file. It looks for the config file
@@ -118,10 +118,10 @@ func loadConfig(configName string) {
 	V.WatchConfig()
 }
 
-// InitLogging initializes the logger based on the log level specified in the config file.
-func InitLogging() *zap.Logger {
+// initLogging initializes the logger based on the log level specified in the config file.
+func initLogging() *zap.Logger {
 	rawJSON := []byte(`{
-		"level": "` + strings.ToLower(Cfg.Proxy.LogLevel) + `",
+		"level": "` + strings.ToLower(Cfg.Log.Level) + `",
 		"encoding": "json",
 		"outputPaths": ["stdout"],
 		"errorOutputPaths": ["stdout"],
@@ -145,11 +145,70 @@ func InitLogging() *zap.Logger {
 	return Logger
 }
 
-// InitJWKS initializes the JWKS (JSON Web Key Set) from a specified URL. It sets up the refresh parameters
+func initTLSConfig() {
+	rootCAs, _ := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+
+	if Cfg.Web.TrustedRootCaPath != "" {
+		err := filepath.Walk(Cfg.Web.TrustedRootCaPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() || strings.Contains(info.Name(), "..") {
+				return nil
+			}
+
+			certs, err := os.ReadFile(path)
+			if err != nil {
+				Logger.Error("Error while reading trusted CA", zap.Error(err))
+				return err
+			}
+			Logger.Debug("Adding trusted CA", zap.String("path", path))
+			certs = append(certs, []byte("\n")...)
+			rootCAs.AppendCertsFromPEM(certs)
+
+			return nil
+		})
+
+		if err != nil {
+			Logger.Error("Error while traversing directory", zap.Error(err))
+		}
+	}
+
+	var certificates []tls.Certificate
+
+	lokiCert, err := tls.LoadX509KeyPair(Cfg.Loki.Cert, Cfg.Loki.Key)
+	if err != nil {
+		Logger.Error("Error while loading loki certificate", zap.Error(err))
+	} else {
+		Logger.Debug("Adding Loki certificate", zap.String("path", Cfg.Loki.Cert))
+		certificates = append(certificates, lokiCert)
+	}
+
+	thanosCert, err := tls.LoadX509KeyPair(Cfg.Thanos.Cert, Cfg.Thanos.Key)
+	if err != nil {
+		Logger.Error("Error while loading thanos certificate", zap.Error(err))
+	} else {
+		Logger.Debug("Adding Thanos certificate", zap.String("path", Cfg.Loki.Cert))
+		certificates = append(certificates, thanosCert)
+	}
+
+	config := &tls.Config{
+		InsecureSkipVerify: Cfg.Web.InsecureSkipVerify,
+		RootCAs:            rootCAs,
+		Certificates:       certificates,
+	}
+
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = config
+}
+
+// initJWKS initializes the JWKS (JSON Web Key Set) from a specified URL. It sets up the refresh parameters
 // for the JWKS and handles any errors that occur during the refresh.
-func InitJWKS() {
+func initJWKS() {
 	Logger.Info("Init Keycloak config")
-	jwksURL := Cfg.Proxy.JwksCertURL
+	jwksURL := Cfg.Web.JwksCertURL
 
 	options := keyfunc.Options{
 		RefreshErrorHandler: func(err error) {
@@ -172,10 +231,10 @@ func InitJWKS() {
 	Logger.Info("Finished Keycloak config")
 }
 
-// InitDB establishes a connection to the database if the `Db.Enabled` configuration setting is `true`.
+// initDB establishes a connection to the database if the `Db.Enabled` configuration setting is `true`.
 // It reads the database password from a file, sets up the database connection configuration,
 // and opens the database connection.
-func InitDB() {
+func initDB() {
 	password, err := os.ReadFile(Cfg.Db.PasswordPath)
 	if err != nil {
 		Logger.Panic("Could not read db password", zap.Error(err))
