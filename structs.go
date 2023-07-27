@@ -49,6 +49,7 @@ type Config struct {
 	Loki struct {
 		URL         string `mapstructure:"url"`
 		TenantLabel string `mapstructure:"tenant_label"`
+		Tenant      string `mapstructure:"tenant"`
 		Cert        string `mapstructure:"cert"`
 		Key         string `mapstructure:"key"`
 	} `mapstructure:"loki"`
