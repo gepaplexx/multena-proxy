@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -157,6 +158,7 @@ func Test_reverseProxy(t *testing.T) {
 	}{
 		{
 			name:           "Missing headers",
+			URL:            "/api/v1/query_range",
 			expectedStatus: http.StatusForbidden,
 			expectedBody:   "No Authorization header found\n",
 		},
@@ -164,6 +166,7 @@ func Test_reverseProxy(t *testing.T) {
 			name:             "Malformed authorization header: B ",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
+			URL:              "/api/v1/query_range",
 			authorization:    "B",
 			expectedBody:     "No Authorization header found\n",
 		},
@@ -171,6 +174,7 @@ func Test_reverseProxy(t *testing.T) {
 			name:             "Malformed authorization header: Bearer ",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
+			URL:              "/api/v1/query_range",
 			authorization:    "Bearer ",
 			expectedBody:     "No Authorization header found\n",
 		},
@@ -178,6 +182,7 @@ func Test_reverseProxy(t *testing.T) {
 			name:             "Malformed authorization header: Bearer skk",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
+			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + "skk",
 			expectedBody:     "Error parsing Keycloak token\n",
 		},
@@ -186,6 +191,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
 			setPluginID:      true,
+			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + tokens["noTenant"],
 			expectedBody:     "No tenant labels found\n",
 		},
@@ -195,6 +201,7 @@ func Test_reverseProxy(t *testing.T) {
 			pluginID:         "thanos",
 			setAuthorization: true,
 			setPluginID:      true,
+			URL:              "/api/v1/query_range",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
 		},
@@ -204,7 +211,7 @@ func Test_reverseProxy(t *testing.T) {
 			pluginID:         "thanos",
 			setAuthorization: true,
 			setPluginID:      true,
-			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
+			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
 			expectedBody:     "user not allowed with namespace forbidden_tenant\n",
 		},
@@ -214,7 +221,7 @@ func Test_reverseProxy(t *testing.T) {
 			pluginID:         "thanos",
 			setAuthorization: true,
 			setPluginID:      true,
-			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
+			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
 			expectedBody:     "No tenant labels found\n",
 		},
@@ -254,7 +261,7 @@ func Test_reverseProxy(t *testing.T) {
 			pluginID:         "loki",
 			setAuthorization: true,
 			setPluginID:      true,
-			URL:              "/api/v1/query?query={tenant_id=\"also_allowed_group1\"} != 1337",
+			URL:              "/api/v1/query_range?query={tenant_id=\"also_allowed_group1\"} != 1337",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
 		},
@@ -269,6 +276,8 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Upstream server response\n",
 		},
 	}
+
+	r := application()
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -288,8 +297,10 @@ func Test_reverseProxy(t *testing.T) {
 			// Prepare the response recorder
 			rr := httptest.NewRecorder()
 
+			Logger.Debug("Request", zap.String("URL", tc.URL), zap.String("Authorization", tc.authorization), zap.String("X-Plugin-Id", tc.pluginID))
+
 			// Call the function
-			reverseProxy(rr, req)
+			r.ServeHTTP(rr, req)
 
 			// Check the status code
 			assert.Equal(t, tc.expectedStatus, rr.Code)
