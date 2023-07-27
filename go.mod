@@ -7,7 +7,9 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang-jwt/jwt/v5 v5.0.0
+	github.com/gorilla/mux v1.8.0
 	github.com/observatorium/api v0.1.3-0.20230619071616-b6adb8453744
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus-community/prom-label-proxy v0.7.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/prometheus v0.45.0
@@ -51,7 +53,6 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/alertmanager v0.25.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
@@ -78,4 +79,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.45.0
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.46.0
