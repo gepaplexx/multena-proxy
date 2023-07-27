@@ -51,6 +51,10 @@ func init() {
 			}
 			ServiceAccountToken = string(sa)
 		}
+	} else {
+		if Cfg.Dev.Enabled {
+			panic("Dev mode is not supported in test mode")
+		}
 	}
 
 	if Cfg.Db.Enabled {
