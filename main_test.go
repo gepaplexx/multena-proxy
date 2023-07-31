@@ -160,7 +160,7 @@ func Test_reverseProxy(t *testing.T) {
 			name:           "Missing headers",
 			URL:            "/api/v1/query_range",
 			expectedStatus: http.StatusForbidden,
-			expectedBody:   "No Authorization header found\n",
+			expectedBody:   "no Authorization header found\n",
 		},
 		{
 			name:             "Malformed authorization header: B ",
@@ -168,7 +168,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "B",
-			expectedBody:     "No Authorization header found\n",
+			expectedBody:     "invalid Authorization header\n",
 		},
 		{
 			name:             "Malformed authorization header: Bearer ",
@@ -176,7 +176,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer ",
-			expectedBody:     "No Authorization header found\n",
+			expectedBody:     "error parsing Keycloak token\n",
 		},
 		{
 			name:             "Malformed authorization header: Bearer skk",
@@ -184,7 +184,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + "skk",
-			expectedBody:     "Error parsing Keycloak token\n",
+			expectedBody:     "error parsing Keycloak token\n",
 		},
 		{
 			name:             "Missing tenant labels for user",
@@ -313,33 +313,15 @@ func Test_reverseProxy(t *testing.T) {
 	}
 }
 
-func TestHasAuthorizationHeader(t *testing.T) {
-	assert := assert.New(t)
-
-	req, _ := http.NewRequest("GET", "http://example.com", nil)
-	assert.False(hasAuthorizationHeader(req))
-
-	req.Header.Set("Authorization", "Bearer abc123")
-	assert.True(hasAuthorizationHeader(req))
-}
-
-func TestGetBearerToken(t *testing.T) {
-	assert := assert.New(t)
-
-	req, _ := http.NewRequest("GET", "http://example.com", nil)
-	req.Header.Set("Authorization", "Bearer abc123")
-	assert.Equal("abc123", getBearerToken(req))
-}
-
 func TestIsAdminSkip(t *testing.T) {
 	assert := assert.New(t)
 
 	token := &KeycloakToken{Groups: []string{"gepardec-run-admins"}, ApaGroupsOrg: []string{"gepardec-run-admins"}}
-	assert.True(isAdminSkip(*token))
+	assert.True(isAdmin(*token))
 
 	token.Groups = []string{"user"}
 	token.ApaGroupsOrg = []string{"org"}
-	assert.False(isAdminSkip(*token))
+	assert.False(isAdmin(*token))
 }
 
 func TestLogAndWriteError(t *testing.T) {
