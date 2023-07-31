@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,10 +17,9 @@ import (
 )
 
 type Route struct {
-	Url         string
-	Enforcer    func(string, map[string]bool) (string, error)
-	UpstreamUrl *url.URL
-	MatchWord   string
+	Url        string
+	Datasource string
+	MatchWord  string
 }
 
 func application() *mux.Router {
@@ -30,28 +30,30 @@ func application() *mux.Router {
 	}
 
 	r := mux.NewRouter()
+	r.Use(loggingMiddleware)
+	r.Use(authMiddleware)
 
 	routes := []Route{
 		//loki
-		{Url: "/loki/api/v1/query", Enforcer: logqlEnforcer, UpstreamUrl: lokiUrl, MatchWord: "query"},
-		{Url: "/loki/api/v1/query_range", Enforcer: logqlEnforcer, UpstreamUrl: lokiUrl, MatchWord: "query"},
-		{Url: "/loki/api/v1/label/{name}/values", Enforcer: logqlEnforcer, UpstreamUrl: lokiUrl, MatchWord: "query"},
-		{Url: "/loki/api/v1/series", Enforcer: logqlEnforcer, UpstreamUrl: lokiUrl, MatchWord: "match[]"},
-		{Url: "/loki/api/v1/tail", Enforcer: logqlEnforcer, UpstreamUrl: lokiUrl, MatchWord: "query"},
-		{Url: "/loki/api/v1/index/stats", Enforcer: logqlEnforcer, UpstreamUrl: lokiUrl, MatchWord: "query"},
+		{Url: "/loki/api/v1/query", Datasource: "loki", MatchWord: "query"},
+		{Url: "/loki/api/v1/query_range", Datasource: "loki", MatchWord: "query"},
+		{Url: "/loki/api/v1/label/{name}/values", Datasource: "loki", MatchWord: "query"},
+		{Url: "/loki/api/v1/series", Datasource: "loki", MatchWord: "match[]"},
+		{Url: "/loki/api/v1/tail", Datasource: "loki", MatchWord: "query"},
+		{Url: "/loki/api/v1/index/stats", Datasource: "loki", MatchWord: "query"},
 		// Thanos
-		{Url: "/api/v1/query", Enforcer: promqlEnforcer, UpstreamUrl: thanosUrl, MatchWord: "query"},
-		{Url: "/api/v1/query_range", Enforcer: promqlEnforcer, UpstreamUrl: thanosUrl, MatchWord: "query"},
-		{Url: "/api/v1/format_query", Enforcer: promqlEnforcer, UpstreamUrl: thanosUrl, MatchWord: "query"},
-		{Url: "/api/v1/series", Enforcer: promqlEnforcer, UpstreamUrl: thanosUrl, MatchWord: "match[]"},
-		{Url: "/api/v1/labels", Enforcer: promqlEnforcer, UpstreamUrl: thanosUrl, MatchWord: "match[]"},
-		{Url: "/api/v1/label/{label}/values", Enforcer: promqlEnforcer, UpstreamUrl: thanosUrl, MatchWord: "match[]"},
-		{Url: "/api/v1/query_exemplars", Enforcer: promqlEnforcer, UpstreamUrl: thanosUrl, MatchWord: "query"},
-		{Url: "/api/v1/status/buildinfo", Enforcer: promqlEnforcer, UpstreamUrl: thanosUrl, MatchWord: "query"},
+		{Url: "/api/v1/query", Datasource: "thanos", MatchWord: "query"},
+		{Url: "/api/v1/query_range", Datasource: "thanos", MatchWord: "query"},
+		{Url: "/api/v1/format_query", Datasource: "thanos", MatchWord: "query"},
+		{Url: "/api/v1/series", Datasource: "thanos", MatchWord: "match[]"},
+		{Url: "/api/v1/labels", Datasource: "thanos", MatchWord: "match[]"},
+		{Url: "/api/v1/label/{label}/values", Datasource: "thanos", MatchWord: "match[]"},
+		{Url: "/api/v1/query_exemplars", Datasource: "thanos", MatchWord: "query"},
+		{Url: "/api/v1/status/buildinfo", Datasource: "thanos", MatchWord: "query"},
 	}
 
 	for _, route := range routes {
-		handleRoute(r, route)
+		handleRoute(r, route, thanosUrl, lokiUrl)
 	}
 
 	r.HandleFunc("/loki/api/v1/labels", func(w http.ResponseWriter, r *http.Request) {
@@ -60,10 +62,6 @@ func application() *mux.Router {
 	}).Methods("GET")
 
 	r.HandleFunc("/api/v1/status/buildinfo", func(w http.ResponseWriter, r *http.Request) {
-		_, _, err := authorize(r)
-		if err != nil {
-			logAndWriteError(w, http.StatusForbidden, err)
-		}
 		callUpstream(w, r, thanosUrl)
 	}).Methods("GET")
 
@@ -73,72 +71,82 @@ func application() *mux.Router {
 	return r
 }
 
-func handleRoute(r *mux.Router, route Route) {
+func handleRoute(r *mux.Router, route Route, thanosUrl *url.URL, lokiUrl *url.URL) {
+	var datasourceURL *url.URL
+	var enforceFunc func(string, map[string]bool) (string, error)
+	if route.Datasource == "thanos" {
+		datasourceURL = thanosUrl
+		enforceFunc = promqlEnforcer
+	}
+	if route.Datasource == "loki" {
+		datasourceURL = lokiUrl
+		enforceFunc = logqlEnforcer
+	}
+	if datasourceURL == nil {
+		Logger.Panic("No datasource URL found")
+	}
+
 	r.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
-		keycloakToken, skip, err := authorize(r)
-		if err != nil {
-			logAndWriteError(w, http.StatusForbidden, err)
-			return
-		}
-		Logger.Debug("token", zap.Any("token", keycloakToken))
-		if !skip {
-			tenantLabels, err := getTenantLabels(keycloakToken)
+		token := r.Context().Value("token").(KeycloakToken)
+		if !isAdmin(token) {
+			labels, err := getTenantLabels(token)
 			if err != nil {
 				logAndWriteErrorMsg(w, "No tenant labels found", http.StatusForbidden, err)
 				return
 			}
-			err = enforce(r, tenantLabels, route.MatchWord, route.Enforcer)
+			err = enforce(r, labels, route.MatchWord, enforceFunc)
 			if err != nil {
 				logAndWriteError(w, http.StatusForbidden, err)
 				return
 			}
 			if r.Method == "POST" {
-				err = enforcePost(r, tenantLabels, route.MatchWord, route.Enforcer)
+				err = enforcePost(r, labels, route.MatchWord, enforceFunc)
 				if err != nil {
 					logAndWriteError(w, http.StatusForbidden, err)
 					return
 				}
 			}
 		}
-		callUpstream(w, r, route.UpstreamUrl)
+		callUpstream(w, r, datasourceURL)
 	})
 }
 
 // -------------------------------  authorize section   ---------------------------------------------
-func authorize(req *http.Request) (KeycloakToken, bool, error) {
-	if !hasAuthorizationHeader(req) {
-		return KeycloakToken{}, false, errors.New("No Authorization header found")
-	}
-	Logger.Debug("Has Authorization header")
 
-	tokenString := getBearerToken(req)
-	keycloakToken, token, err := parseJwtToken(tokenString)
-	Logger.Debug("Parsed JWT token", zap.Any("token", token), zap.Any("keycloakToken", keycloakToken), zap.Error(err))
-	if err != nil && !Cfg.Dev.Enabled {
-		return KeycloakToken{}, false, errors.New("Error parsing Keycloak token")
-	}
-	Logger.Debug("Parsed JWT token")
+func authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authToken, err := getBearerToken(r)
+		if err != nil {
+			logAndWriteError(w, http.StatusForbidden, err)
+			return
+		}
 
-	if !isValidToken(token) {
-		return KeycloakToken{}, false, errors.New("Invalid token")
-	}
+		keycloakToken, token, err := parseJwtToken(authToken)
+		if err != nil && !Cfg.Dev.Enabled {
+			logAndWriteErrorMsg(w, "error parsing Keycloak token\n", http.StatusForbidden, err)
+			return
+		}
 
-	if isAdminSkip(keycloakToken) {
-		return KeycloakToken{}, true, nil
-	}
+		if !isValidToken(token) {
+			logAndWriteErrorMsg(w, "invalid token", http.StatusForbidden, nil)
+		}
 
-	return keycloakToken, false, nil
+		ctx := context.WithValue(r.Context(), "token", keycloakToken)
+		newReq := r.WithContext(ctx)
+		next.ServeHTTP(w, newReq)
+	})
 }
 
-// hasAuthorizationHeader checks whether the given HTTP request contains an "Authorization" header.
-func hasAuthorizationHeader(req *http.Request) bool {
-	authorization := req.Header.Get("Authorization")
-	return authorization != "" && len(authorization) > 7
-}
-
-// getBearerToken extracts the JWT token from the "Authorization" header in the given HTTP request.
-func getBearerToken(req *http.Request) string {
-	return req.Header.Get("Authorization")[7:]
+func getBearerToken(r *http.Request) (string, error) {
+	authToken := r.Header.Get("Authorization")
+	if authToken == "" {
+		return "", errors.New("no Authorization header found")
+	}
+	splitToken := strings.Split(authToken, "Bearer")
+	if len(splitToken) != 2 {
+		return "", errors.New("invalid Authorization header")
+	}
+	return strings.TrimSpace(splitToken[1]), nil
 }
 
 // parseJwtToken parses a JWT token string into a Keycloak token and a JWT token. It returns an error if parsing fails.
@@ -158,8 +166,8 @@ func isValidToken(token *jwt.Token) bool {
 	return token.Valid || Cfg.Dev.Enabled
 }
 
-// isAdminSkip checks if a user belongs to the admin group. It can bypass some checks for admin users.
-func isAdminSkip(token KeycloakToken) bool {
+// isAdmin checks if a user belongs to the admin group. It can bypass some checks for admin users.
+func isAdmin(token KeycloakToken) bool {
 	return (ContainsIgnoreCase(token.Groups, Cfg.Admin.Group) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Admin.Group)) && Cfg.Admin.Bypass
 }
 
@@ -231,13 +239,59 @@ func callUpstream(rw http.ResponseWriter, req *http.Request, upstream *url.URL) 
 	Logger.Debug("Doing request")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", ServiceAccountToken))
 	Logger.Debug("Set Authorization header")
-	logRequest(req)
 
 	proxy := httputil.NewSingleHostReverseProxy(upstream)
 	proxy.ServeHTTP(rw, req)
 }
 
 // -------------------------------  log http section   ---------------------------------------------
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var bodyBytes []byte
+		if r.Body != nil {
+			bodyBytes, _ = io.ReadAll(r.Body)
+		}
+
+		// Restore the io.ReadCloser to its original state
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		if !Cfg.Log.LogTokens {
+			bodyBytes = []byte("[REDACTED]")
+		}
+
+		requestData := struct {
+			Method string      `json:"method"`
+			URL    string      `json:"url"`
+			Header http.Header `json:"header"`
+			Body   string      `json:"body"`
+		}{
+			Method: r.Method,
+			URL:    r.URL.String(),
+			Header: r.Header,
+			Body:   string(bodyBytes),
+		}
+
+		if !Cfg.Log.LogTokens {
+			copyHeader := make(http.Header)
+			for k, v := range requestData.Header {
+				copyHeader[k] = v
+			}
+			copyHeader.Del("Authorization")
+			copyHeader.Del("X-Plugin-Id")
+			copyHeader.Del("X-Id-Token")
+			requestData.Header = copyHeader
+		}
+
+		jsonData, err := json.Marshal(requestData)
+		if err != nil {
+			Logger.Error("Error while marshalling request", zap.Error(err))
+			return
+		}
+		Logger.Debug("Request", zap.String("request", string(jsonData)), zap.String("path", r.URL.Path))
+		next.ServeHTTP(w, r)
+		Logger.Debug("Request", zap.String("complete", "true"))
+	})
+}
 
 // logAndWriteErrorMsg logs an error and sends an error message as the HTTP response.
 func logAndWriteErrorMsg(rw http.ResponseWriter, message string, statusCode int, err error) {
@@ -251,50 +305,6 @@ func logAndWriteError(rw http.ResponseWriter, statusCode int, err error) {
 	Logger.Error(err.Error(), zap.Error(err))
 	rw.WriteHeader(statusCode)
 	_, _ = fmt.Fprint(rw, err.Error()+"\n")
-}
-
-// logRequest logs the details of an incoming HTTP request.
-func logRequest(req *http.Request) {
-	var bodyBytes []byte
-	if req.Body != nil {
-		bodyBytes, _ = io.ReadAll(req.Body)
-	}
-
-	// Restore the io.ReadCloser to its original state
-	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	if !Cfg.Log.LogTokens {
-		bodyBytes = []byte("[REDACTED]")
-	}
-
-	requestData := struct {
-		Method string      `json:"method"`
-		URL    string      `json:"url"`
-		Header http.Header `json:"header"`
-		Body   string      `json:"body"`
-	}{
-		Method: req.Method,
-		URL:    req.URL.String(),
-		Header: req.Header,
-		Body:   string(bodyBytes),
-	}
-
-	if !Cfg.Log.LogTokens {
-		copyHeader := make(http.Header)
-		for k, v := range requestData.Header {
-			copyHeader[k] = v
-		}
-		copyHeader.Del("Authorization")
-		copyHeader.Del("X-Plugin-Id")
-		copyHeader.Del("X-Id-Token")
-		requestData.Header = copyHeader
-	}
-
-	jsonData, err := json.Marshal(requestData)
-	if err != nil {
-		Logger.Error("Error while marshalling request", zap.Error(err))
-		return
-	}
-	Logger.Debug("Request", zap.String("request", string(jsonData)), zap.String("path", req.URL.Path))
 }
 
 // -------------------------------  end log http section   ---------------------------------------------
