@@ -22,8 +22,14 @@ type Route struct {
 	MatchWord  string
 }
 
+type kkToken struct {
+}
+
 func application() *mux.Router {
 	lokiUrl, err := url.Parse(Cfg.Loki.URL)
+	if err != nil {
+		Logger.Panic("Error parsing URL", zap.Error(err))
+	}
 	thanosUrl, err := url.Parse(Cfg.Thanos.URL)
 	if err != nil {
 		Logger.Panic("Error parsing URL", zap.Error(err))
@@ -87,7 +93,7 @@ func handleRoute(r *mux.Router, route Route, thanosUrl *url.URL, lokiUrl *url.UR
 	}
 
 	r.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value("token").(KeycloakToken)
+		token := r.Context().Value(kkToken{}).(KeycloakToken)
 		if !isAdmin(token) {
 			labels, err := getTenantLabels(token)
 			if err != nil {
@@ -131,7 +137,7 @@ func authMiddleware(next http.Handler) http.Handler {
 			logAndWriteErrorMsg(w, "invalid token", http.StatusForbidden, nil)
 		}
 
-		ctx := context.WithValue(r.Context(), "token", keycloakToken)
+		ctx := context.WithValue(r.Context(), kkToken{}, keycloakToken)
 		newReq := r.WithContext(ctx)
 		next.ServeHTTP(w, newReq)
 	})
