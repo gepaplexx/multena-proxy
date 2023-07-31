@@ -30,7 +30,7 @@ func main() {
 	})
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/healthz", http.HandlerFunc(healthz))
+	mux.Handle("/healthz", http.HandlerFunc(HealthCheckHandler))
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
 
 	go func() {
@@ -46,8 +46,9 @@ func main() {
 	}
 }
 
-// healthz is an HTTP handler that always returns an HTTP status of 200 and a response body of "Ok". It's commonly used for health checks.
-func healthz(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprint(w, "Ok")
+// HealthCheckHandler is an HTTP handler that always returns an HTTP status of 200 and a response body of "Ok".
+// It's commonly used for health checks.
+func HealthCheckHandler(responseWriter http.ResponseWriter, _ *http.Request) {
+	responseWriter.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprintf(responseWriter, "%s", "Ok")
 }
