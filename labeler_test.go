@@ -68,7 +68,7 @@ func TestGetLabelsCM(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			labels := GetLabelsCM(tc.username, tc.groups)
+			labels := GetLabelsCM(KeycloakToken{PreferredUsername: tc.username, Groups: tc.groups})
 			assert.Equal(t, tc.expected, labels)
 		})
 	}
