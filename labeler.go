@@ -9,7 +9,9 @@ import (
 // GetLabelsCM retrieves the namespaces associated with a user and their groups. It merges the
 // user's namespaces and the namespaces of each group the user belongs to into a map, avoiding
 // duplicates, and returns it. The map keys are the namespaces and the values are all set to true.
-func GetLabelsCM(username string, groups []string) map[string]bool {
+func GetLabelsCM(token KeycloakToken) map[string]bool {
+	username := token.PreferredUsername
+	groups := token.Groups
 	var mergedNamespaces map[string]bool
 	if len(groups) >= 1 {
 		mergedNamespaces = make(map[string]bool, len(username)+len(groups)*len(groups[0]))
@@ -28,12 +30,13 @@ func GetLabelsCM(username string, groups []string) map[string]bool {
 	return mergedNamespaces
 }
 
-// GetLabelsFromDB retrieves the namespaces associated with a user from a database. It prepares
+// GetLabelsDB retrieves the namespaces associated with a user from a database. It prepares
 // the configured DB query by replacing each question mark with the user's email. Then it queries
 // the DB and reads the result into a map. The map keys are the namespaces and the values are all
 // set to true. If there are any errors during querying or scanning the result, it logs the error
 // and panics. It returns the map of namespaces.
-func GetLabelsFromDB(email string) map[string]bool {
+func GetLabelsDB(token KeycloakToken) map[string]bool {
+	email := token.Email
 	db := DB
 	n := strings.Count(Cfg.Db.Query, "?")
 
