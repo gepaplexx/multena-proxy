@@ -150,8 +150,6 @@ func Test_reverseProxy(t *testing.T) {
 		name             string
 		setAuthorization bool
 		authorization    string
-		setPluginID      bool
-		pluginID         string
 		expectedStatus   int
 		expectedBody     string
 		URL              string
@@ -190,7 +188,6 @@ func Test_reverseProxy(t *testing.T) {
 			name:             "Missing tenant labels for user",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + tokens["noTenant"],
 			expectedBody:     "No tenant labels found\n",
@@ -198,9 +195,7 @@ func Test_reverseProxy(t *testing.T) {
 		{
 			name:             "Valid token and headers, no query",
 			authorization:    "Bearer " + tokens["userTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query_range",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
@@ -208,9 +203,7 @@ func Test_reverseProxy(t *testing.T) {
 		{
 			name:             "User belongs to multiple groups, accessing forbidden tenant",
 			authorization:    "Bearer " + tokens["groupTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
 			expectedBody:     "user not allowed with namespace forbidden_tenant\n",
@@ -218,9 +211,7 @@ func Test_reverseProxy(t *testing.T) {
 		{
 			name:             "User belongs to no groups, accessing forbidden tenant",
 			authorization:    "Bearer " + tokens["noTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
 			expectedBody:     "No tenant labels found\n",
@@ -228,9 +219,7 @@ func Test_reverseProxy(t *testing.T) {
 		{
 			name:             "User belongs to no groups, accessing forbidden tenant",
 			authorization:    "Bearer " + tokens["noGroupsTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
 			expectedBody:     "No tenant labels found\n",
@@ -238,9 +227,7 @@ func Test_reverseProxy(t *testing.T) {
 		{
 			name:             "User belongs to multiple groups, accessing allowed tenant",
 			authorization:    "Bearer " + tokens["groupTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"allowed_group1\"}",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
@@ -248,9 +235,7 @@ func Test_reverseProxy(t *testing.T) {
 		{
 			name:             "User belongs to multiple groups, accessing allowed tenants",
 			authorization:    "Bearer " + tokens["groupsTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query?query=up{tenant_id=~\"allowed_group1|also_allowed_group2\"}",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
@@ -258,9 +243,7 @@ func Test_reverseProxy(t *testing.T) {
 		{
 			name:             "User belongs to multiple groups, accessing allowed tenant",
 			authorization:    "Bearer " + tokens["groupsTenant"],
-			pluginID:         "loki",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query_range?query={tenant_id=\"also_allowed_group1\"} != 1337",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
@@ -268,16 +251,41 @@ func Test_reverseProxy(t *testing.T) {
 		{
 			name:             "User belongs to multiple groups, accessing allowed tenants",
 			authorization:    "Bearer " + tokens["groupsTenant"],
-			pluginID:         "loki",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query?query={tenant_id=~\"allowed_group1|allowed_group2\"} != 1337",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
 		},
+		{
+			name:             "Loki query range, accessing allowed tenant",
+			authorization:    "Bearer " + tokens["groupsTenant"],
+			setAuthorization: true,
+			URL:              "/loki/api/v1/query_range?direction=backward&end=1690463973787000000&limit=1000&query=sum by (level) (count_over_time({tenant_id=\"allowed_group1\"} |= `path` |= `label` | json | line_format `{{.message}}` | json | line_format `{{.request}}` | json | line_format `{{.method | printf \"%-4s\"}} {{.path | printf \"%-60s\"}} {{.url | urldecode}}`[1m]))&start=1690377573787000000&step=60000ms",
+			expectedStatus:   http.StatusOK,
+			expectedBody:     "Upstream server response\n",
+		},
+		{
+			name:             "Loki index stats, accessing allowed tenant",
+			authorization:    "Bearer " + tokens["userTenant"],
+			setAuthorization: true,
+			URL:              "/loki/api/v1/index/stats?query={tenant_id=\"allowed_user\"}&start=1690377573724000000&end=1690463973724000000",
+			expectedStatus:   http.StatusOK,
+			expectedBody:     "Upstream server response\n",
+		},
+		{
+			name:             "Loki query range with forbidden tenant",
+			authorization:    "Bearer " + tokens["userTenant"],
+			setAuthorization: true,
+			URL:              "/loki/api/v1/query_range?direction=backward&end=1690463973693000000&limit=10&query={tenant_id=\"forbidden_tenant\"} |= `path` |= `label` | json | line_format `{{.message}}` | json | line_format `{{.request}}` | json | line_format `{{.method}} {{.path}} {{.url | urldecode}}`&start=1690377573693000000&step=86400000ms",
+			expectedStatus:   http.StatusForbidden,
+			expectedBody:     "unauthorized namespace forbidden_tenant\n",
+		},
 	}
 
-	r := application()
+	r, _, err := application()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -290,14 +298,11 @@ func Test_reverseProxy(t *testing.T) {
 			if tc.setAuthorization {
 				req.Header.Add("Authorization", tc.authorization)
 			}
-			if tc.setPluginID {
-				req.Header.Add("X-Plugin-Id", "thanos")
-			}
 
 			// Prepare the response recorder
 			rr := httptest.NewRecorder()
 
-			Logger.Debug("Request", zap.String("URL", tc.URL), zap.String("Authorization", tc.authorization), zap.String("X-Plugin-Id", tc.pluginID))
+			Logger.Debug("Request", zap.String("URL", tc.URL), zap.String("Authorization", tc.authorization))
 
 			// Call the function
 			r.ServeHTTP(rr, req)
@@ -328,7 +333,7 @@ func TestLogAndWriteError(t *testing.T) {
 	assert := assert.New(t)
 
 	rw := httptest.NewRecorder()
-	logAndWriteErrorMsg(rw, "test error", http.StatusInternalServerError, nil)
+	logAndWriteError(rw, http.StatusInternalServerError, nil, "test error")
 	assert.Equal(http.StatusInternalServerError, rw.Code)
 	assert.Equal("test error\n", rw.Body.String())
 }
