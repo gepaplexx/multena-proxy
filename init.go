@@ -11,6 +11,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,14 +28,17 @@ var (
 	Logger              *zap.Logger
 	Cfg                 *Config
 	V                   *viper.Viper
+	GetLabelsFunc       func(token KeycloakToken) map[string]bool
+	atomicLevel         zap.AtomicLevel
 )
 
 // init carries out the main initialization routine for the Proxy. It logs the commit information,
 // configures the HTTP client to ignore self-signed certificates, reads the service account token,
 // initializes JWKS if not in development mode, and establishes a database connection if enabled in the config.
 func init() {
-	initConfig()
 	initLogging()
+	initConfig()
+	updateLogLevel()
 	Logger.Info("-------Init Proxy-------")
 	Logger.Info("Commit: ", zap.String("commit", Commit))
 	Logger.Info("Set http client to ignore self signed certificates")
@@ -60,7 +64,19 @@ func init() {
 	if Cfg.Db.Enabled {
 		initDB()
 	}
+
+	if Cfg.TenantProvider == "configmap" {
+		GetLabelsFunc = GetLabelsCM
+	}
+	if Cfg.TenantProvider == "mysql" {
+		GetLabelsFunc = GetLabelsDB
+	}
+	if GetLabelsFunc == nil {
+		Logger.Panic("Tenant provider not supported")
+	}
+
 	Logger.Info("------Init Complete------")
+
 }
 
 // initConfig initializes the configuration from the files `config` and `labels` using Viper.
@@ -89,15 +105,16 @@ func onConfigChange(e fsnotify.Event) {
 		V.SetConfigName(name) // name of config file (without extension)
 		err := V.MergeInConfig()
 		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("fatal error config file: %w", err))
+			Logger.Panic("Error while reading config file", zap.Error(err))
 		}
 		err = V.Unmarshal(Cfg)
 		if err != nil { // Handle errors reading the config file
-			panic(fmt.Errorf("fatal error config file: %w", err))
+			Logger.Panic("Error while unmarshalling config file", zap.Error(err))
 		}
 	}
-	fmt.Printf("{\"level\":\"info\",\"config\":\"%+v/\"}", Cfg)
-	fmt.Printf("{\"level\":\"info\",\"message\":\"Config file changed: %s/\"}", e.Name)
+	Logger.Info("Config reloaded", zap.Any("config", Cfg))
+	Logger.Info("Config file changed", zap.String("file", e.Name))
+	updateLogLevel()
 	initTLSConfig()
 	initJWKS()
 }
@@ -107,16 +124,16 @@ func onConfigChange(e fsnotify.Event) {
 func loadConfig(configName string) {
 	V.SetConfigName(configName) // name of config file (without extension)
 	V.SetConfigType("yaml")
-	fmt.Printf("{\"level\":\"info\",\"message\":\"Looking for config in /etc/config/%s/\"}\n", configName)
+	Logger.Info("Looking for config in /etc/config/", zap.String("configName", configName))
 	V.AddConfigPath(fmt.Sprintf("/etc/config/%s/", configName))
 	V.AddConfigPath("./configs")
 	err := V.MergeInConfig() // Find and read the config file
 	if err != nil {          // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %w", err))
+		Logger.Panic("Error while reading config file", zap.Error(err))
 	}
 	err = V.Unmarshal(Cfg)
 	if err != nil { // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %w", err))
+		Logger.Panic("Error while unmarshalling config file", zap.Error(err))
 	}
 	V.OnConfigChange(onConfigChange)
 	V.WatchConfig()
@@ -124,13 +141,16 @@ func loadConfig(configName string) {
 
 // initLogging initializes the logger based on the log level specified in the config file.
 func initLogging() *zap.Logger {
+	atomicLevel = zap.NewAtomicLevel()
+	atomicLevel.SetLevel(getZapLevel("info"))
+
 	rawJSON := []byte(`{
-		"level": "` + strings.ToLower(Cfg.Log.Level) + `",
+		"level": "info",
 		"encoding": "json",
 		"outputPaths": ["stdout"],
 		"errorOutputPaths": ["stdout"],
 		"encoderConfig": {
-		  "messageKey": "message",
+		  "messageKey": "msg",
 		  "levelKey": "level",
 		  "levelEncoder": "lowercase"
 		}
@@ -140,6 +160,7 @@ func initLogging() *zap.Logger {
 	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
 		panic(err)
 	}
+	cfg.Level = atomicLevel
 	Logger = zap.Must(cfg.Build())
 
 	Logger.Debug("logger construction succeeded")
@@ -147,6 +168,27 @@ func initLogging() *zap.Logger {
 	Logger.Debug("Go OS/Arch", zap.String("os", runtime.GOOS), zap.String("arch", runtime.GOARCH))
 	Logger.Debug("Config", zap.Any("cfg", Cfg))
 	return Logger
+}
+
+func getZapLevel(level string) zapcore.Level {
+	switch level {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	case "fatal":
+		return zapcore.FatalLevel
+	default: // unknown level or not set, default to info
+		return zapcore.InfoLevel
+	}
+}
+
+func updateLogLevel() {
+	atomicLevel.SetLevel(getZapLevel(strings.ToLower(Cfg.Log.Level)))
 }
 
 func initTLSConfig() {
