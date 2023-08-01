@@ -319,21 +319,21 @@ func Test_reverseProxy(t *testing.T) {
 }
 
 func TestIsAdminSkip(t *testing.T) {
-	assert := assert.New(t)
+	a := assert.New(t)
 
 	token := &KeycloakToken{Groups: []string{"gepardec-run-admins"}, ApaGroupsOrg: []string{"gepardec-run-admins"}}
-	assert.True(isAdmin(*token))
+	a.True(isAdmin(*token))
 
 	token.Groups = []string{"user"}
 	token.ApaGroupsOrg = []string{"org"}
-	assert.False(isAdmin(*token))
+	a.False(isAdmin(*token))
 }
 
 func TestLogAndWriteError(t *testing.T) {
-	assert := assert.New(t)
+	a := assert.New(t)
 
 	rw := httptest.NewRecorder()
 	logAndWriteError(rw, http.StatusInternalServerError, nil, "test error")
-	assert.Equal(http.StatusInternalServerError, rw.Code)
-	assert.Equal("test error\n", rw.Body.String())
+	a.Equal(http.StatusInternalServerError, rw.Code)
+	a.Equal("test error\n", rw.Body.String())
 }
