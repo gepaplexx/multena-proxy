@@ -16,36 +16,31 @@ func HealthCheckHandler(w http.ResponseWriter, _ *http.Request) {
 }
 
 // handleRoute sets up a handler function for a given route
-func handleRoute(r *mux.Router, route Route, thanosUrl *url.URL, lokiUrl *url.URL) error {
-	datasourceURL, enforceFunc, err := getRouteConfiguration(route, thanosUrl, lokiUrl)
-	if err != nil {
-		return fmt.Errorf("error getting route configuration: %v", err)
-	}
-
+func handleRoute(r *mux.Router, route Route) {
 	r.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(kkToken{}).(KeycloakToken)
+		ds := r.Context().Value(DatasourceKey).(Datasource)
+		token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
 		if !isAdmin(token) {
 			labels := GetLabelsFunc(token)
 			if len(labels) <= 0 {
-				logAndWriteError(w, http.StatusForbidden, err, "No tenant labels found")
+				logAndWriteError(w, http.StatusForbidden, nil, "No tenant labels found")
+				return
 			}
-			err = enforce(r, labels, route.MatchWord, enforceFunc)
+			err := enforce(r, labels, route.MatchWord, ds.EnforceFunc)
 			if err != nil {
 				logAndWriteError(w, http.StatusForbidden, err, "")
 				return
 			}
 			if r.Method == "POST" {
-				err = enforcePost(r, labels, route.MatchWord, enforceFunc)
+				err = enforcePost(r, labels, route.MatchWord, ds.EnforceFunc)
 				if err != nil {
 					logAndWriteError(w, http.StatusForbidden, err, "")
 					return
 				}
 			}
 		}
-		callUpstream(w, r, datasourceURL)
+		callUpstream(w, r, ds.UpstreamURL)
 	})
-
-	return nil
 }
 
 func callUpstream(rw http.ResponseWriter, req *http.Request, upstream *url.URL) {
