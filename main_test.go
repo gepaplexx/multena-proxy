@@ -94,7 +94,7 @@ func setupTestMain() map[string]string {
 			name:     "noGroupsTenant",
 			Username: "test-user",
 			Email:    "test-email",
-			Groups:   []string{"not-group1", "not-group2"},
+			Groups:   []string{},
 		},
 		{
 			name:     "userAndGroupTenant",
@@ -155,13 +155,13 @@ func Test_reverseProxy(t *testing.T) {
 		URL              string
 	}{
 		{
-			name:           "Missing headers",
+			name:           "Missing_headers",
 			URL:            "/api/v1/query_range",
 			expectedStatus: http.StatusForbidden,
 			expectedBody:   "no Authorization header found\n",
 		},
 		{
-			name:             "Malformed authorization header: B ",
+			name:             "Malformed_authorization_header:_B",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
@@ -169,7 +169,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "invalid Authorization header\n",
 		},
 		{
-			name:             "Malformed authorization header: Bearer ",
+			name:             "Malformed_authorization_header:_Bearer",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
@@ -177,7 +177,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "error parsing Keycloak token\n",
 		},
 		{
-			name:             "Malformed authorization header: Bearer skk",
+			name:             "Malformed_authorization_header:_Bearer_skk",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
@@ -185,7 +185,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "error parsing Keycloak token\n",
 		},
 		{
-			name:             "Missing tenant labels for user",
+			name:             "Missing_tenant_labels_for_user",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
@@ -193,7 +193,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "No tenant labels found\n",
 		},
 		{
-			name:             "Valid token and headers, no query",
+			name:             "Valid_token_and_headers,_no_query",
 			authorization:    "Bearer " + tokens["userTenant"],
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
@@ -201,7 +201,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing forbidden tenant",
+			name:             "User_belongs_to_multiple_groups,_accessing_forbidden_tenant",
 			authorization:    "Bearer " + tokens["groupTenant"],
 			setAuthorization: true,
 			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
@@ -209,7 +209,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "user not allowed with namespace forbidden_tenant\n",
 		},
 		{
-			name:             "User belongs to no groups, accessing forbidden tenant",
+			name:             "Not_a_User,_accessing_forbidden_tenant",
 			authorization:    "Bearer " + tokens["noTenant"],
 			setAuthorization: true,
 			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
@@ -217,7 +217,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "No tenant labels found\n",
 		},
 		{
-			name:             "User belongs to no groups, accessing forbidden tenant",
+			name:             "User_belongs_to_no_groups,_accessing_forbidden_tenant",
 			authorization:    "Bearer " + tokens["noGroupsTenant"],
 			setAuthorization: true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
@@ -225,7 +225,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "No tenant labels found\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing allowed tenant",
+			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenant",
 			authorization:    "Bearer " + tokens["groupTenant"],
 			setAuthorization: true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"allowed_group1\"}",
@@ -233,7 +233,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing allowed tenants",
+			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenants",
 			authorization:    "Bearer " + tokens["groupsTenant"],
 			setAuthorization: true,
 			URL:              "/api/v1/query?query=up{tenant_id=~\"allowed_group1|also_allowed_group2\"}",
@@ -241,7 +241,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing allowed tenant",
+			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenant",
 			authorization:    "Bearer " + tokens["groupsTenant"],
 			setAuthorization: true,
 			URL:              "/api/v1/query_range?query={tenant_id=\"also_allowed_group1\"} != 1337",
@@ -249,7 +249,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing allowed tenants",
+			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenants",
 			authorization:    "Bearer " + tokens["groupsTenant"],
 			setAuthorization: true,
 			URL:              "/api/v1/query?query={tenant_id=~\"allowed_group1|allowed_group2\"} != 1337",
@@ -257,7 +257,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "Loki query range, accessing allowed tenant",
+			name:             "Loki_query_range,_accessing_allowed_tenant",
 			authorization:    "Bearer " + tokens["groupsTenant"],
 			setAuthorization: true,
 			URL:              "/loki/api/v1/query_range?direction=backward&end=1690463973787000000&limit=1000&query=sum by (level) (count_over_time({tenant_id=\"allowed_group1\"} |= `path` |= `label` | json | line_format `{{.message}}` | json | line_format `{{.request}}` | json | line_format `{{.method | printf \"%-4s\"}} {{.path | printf \"%-60s\"}} {{.url | urldecode}}`[1m]))&start=1690377573787000000&step=60000ms",
@@ -265,7 +265,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "Loki index stats, accessing allowed tenant",
+			name:             "Loki_index_stats,_accessing_allowed_tenant",
 			authorization:    "Bearer " + tokens["userTenant"],
 			setAuthorization: true,
 			URL:              "/loki/api/v1/index/stats?query={tenant_id=\"allowed_user\"}&start=1690377573724000000&end=1690463973724000000",
@@ -273,7 +273,7 @@ func Test_reverseProxy(t *testing.T) {
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "Loki query range with forbidden tenant",
+			name:             "Loki_query_range_with_forbidden_tenant",
 			authorization:    "Bearer " + tokens["userTenant"],
 			setAuthorization: true,
 			URL:              "/loki/api/v1/query_range?direction=backward&end=1690463973693000000&limit=10&query={tenant_id=\"forbidden_tenant\"} |= `path` |= `label` | json | line_format `{{.message}}` | json | line_format `{{.request}}` | json | line_format `{{.method}} {{.path}} {{.url | urldecode}}`&start=1690377573693000000&step=86400000ms",
