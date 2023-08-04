@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+// KeycloakToken struct represents the structure of a Keycloak JWT token. It holds
+// the various details associated with a user.
 type KeycloakToken struct {
 	AuthTime       int      `json:"auth_time,omitempty"`
 	SessionState   string   `json:"session_state"`
@@ -41,6 +43,8 @@ type KeycloakToken struct {
 	jwt.RegisteredClaims
 }
 
+// authMiddleware function is a special function that checks the requestor's ticket (authToken)
+// before allowing them to enter the server. If the ticket isn't valid, they are not allowed in.
 func authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authToken, err := getBearerToken(r)
@@ -65,6 +69,8 @@ func authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// getBearerToken function checks for a special 'Authorization' ticket in the request.
+// If it's not present or incorrect, it reports an error.
 func getBearerToken(r *http.Request) (string, error) {
 	authToken := r.Header.Get("Authorization")
 	if authToken == "" {
@@ -77,7 +83,8 @@ func getBearerToken(r *http.Request) (string, error) {
 	return strings.TrimSpace(splitToken[1]), nil
 }
 
-// parseJwtToken parses a JWT token string into a Keycloak token and a JWT token. It returns an error if parsing fails.
+// parseJwtToken function tries to understand the details of the ticket (JWT token).
+// It checks whether the ticket is genuine and has not been tampered with.
 func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
 	keycloakToken := KeycloakToken{}
 	token, err := jwt.ParseWithClaims(tokenString, keycloakToken, func(token *jwt.Token) (interface{}, error) {
@@ -89,16 +96,20 @@ func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
 	return keycloakToken, token, err
 }
 
-// isValidToken checks whether a JWT token is valid or not.
+// isValidToken function checks whether the ticket (token) is still valid.
+// Even if the ticket is genuine, it might be expired, in which case it won't be valid.
 func isValidToken(token *jwt.Token) bool {
 	return token.Valid || Cfg.Dev.Enabled
 }
 
-// isAdmin checks if a user belongs to the admin group. It can bypass some checks for admin users.
+// isAdmin function checks whether the user is an admin or not based on their ticket (token).
+// Admins have special permissions and access in the server.
 func isAdmin(token KeycloakToken) bool {
 	return (ContainsIgnoreCase(token.Groups, Cfg.Admin.Group) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Admin.Group)) && Cfg.Admin.Bypass
 }
 
+// requestWithContext function takes the ticket (token) and attaches it to the request,
+// so it's easier to find and check it later.
 func requestWithContext(r *http.Request, keycloakToken KeycloakToken) *http.Request {
 	ctx := context.WithValue(r.Context(), KeycloakCtxToken, keycloakToken)
 	return r.WithContext(ctx)

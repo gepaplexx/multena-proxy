@@ -10,25 +10,33 @@ import (
 	"net/url"
 )
 
+// Route struct defines a route in the application with a URL and a matching word for label enforcement.
 type Route struct {
 	Url       string
 	MatchWord string
 }
 
+// EnforceFunc is a function type that enforces tenant restrictions on a string given a map of tenant labels.
+// It returns a string and an error.
 type EnforceFunc func(string, map[string]bool) (string, error)
 
+// Datasource struct represents a data source with an upstream URL, an EnforceFunc function, and a UseMutualTLS flag.
 type Datasource struct {
 	UpstreamURL  *url.URL
 	EnforceFunc  EnforceFunc
 	UseMutualTLS bool
 }
 
+// contextKey is a string type that represents a context key.
 type contextKey string
 
+// DatasourceKey and KeycloakCtxToken are the context keys used in the application.
 const DatasourceKey contextKey = "datasource"
 const KeycloakCtxToken contextKey = "keycloakToken"
 
-// application initializes the application's HTTP router
+// application function initializes the application's HTTP router. It configures routes for the Loki and Thanos APIs,
+// and applies middleware for logging, authentication, and setting the data source in the request context.
+// It returns an external router, an internal router, and an error.
 func application() (*mux.Router, *mux.Router, error) {
 
 	lokiUrl, err := url.Parse(Cfg.Loki.URL)
@@ -88,6 +96,8 @@ func application() (*mux.Router, *mux.Router, error) {
 	return e, i, nil
 }
 
+// setDatasource function is a middleware that sets a Datasource in the request context.
+// It takes a Datasource and returns a middleware function.
 func setDatasource(ds Datasource) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -9,6 +9,7 @@ import (
 	"net/http"
 )
 
+// requestData structure contains information about a HTTP request.
 type requestData struct {
 	Method string      `json:"method"`
 	URL    string      `json:"url"`
@@ -16,6 +17,8 @@ type requestData struct {
 	Body   string      `json:"body"`
 }
 
+// loggingMiddleware function is like a security camera at the entrance of a building (the server),
+// it records the details of everyone (requests) that comes in. It can either record everything or hide sensitive details.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var bodyBytes []byte
@@ -31,7 +34,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// readBody reads and restores the request body.
+// readBody function reads the content of a request, kind of like reading a letter that was sent in the mail.
 func readBody(r *http.Request) []byte {
 	var bodyBytes []byte
 	var err error
@@ -46,7 +49,7 @@ func readBody(r *http.Request) []byte {
 	return bodyBytes
 }
 
-// logRequestData prepares and logs the request data.
+// logRequestData function takes note of what is in the request, like noting down the details of the letter that came in the mail.
 func logRequestData(r *http.Request, bodyBytes []byte) {
 	rd := requestData{r.Method, r.URL.String(), r.Header, string(bodyBytes)}
 	if !Cfg.Log.LogTokens {
@@ -60,7 +63,7 @@ func logRequestData(r *http.Request, bodyBytes []byte) {
 	Logger.Debug("Request", zap.String("request", string(jsonData)), zap.String("path", r.URL.Path))
 }
 
-// cleanSensitiveHeaders removes sensitive headers from the copy of headers.
+// cleanSensitiveHeaders function is like removing personal details from the letter before it's recorded or read by someone else.
 func cleanSensitiveHeaders(headers http.Header) http.Header {
 	copyHeader := make(http.Header)
 	for k, v := range headers {
@@ -72,7 +75,7 @@ func cleanSensitiveHeaders(headers http.Header) http.Header {
 	return copyHeader
 }
 
-// logAndWriteError logs an error and sends an error message as the HTTP response.
+// logAndWriteError function is used when something goes wrong in the server, like an error. It takes note of the error and tells the requester about it.
 func logAndWriteError(rw http.ResponseWriter, statusCode int, err error, message string) {
 	if message == "" {
 		message = err.Error()

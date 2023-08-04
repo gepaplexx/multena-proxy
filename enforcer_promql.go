@@ -10,11 +10,13 @@ import (
 	"time"
 )
 
-// promqlEnforcer enforces the PromQL query based on allowed tenant labels. It parses the
-// provided query, extracts the labels, and enforces the labels. Then, it enforces the labels
-// on the parsed expression using an Enforcer. It logs the processed query and returns it.
-// If there are any errors during parsing, extracting, enforcing or enforcing node, it logs
-// the error and returns it.
+// promqlEnforcer enforces tenant restrictions on a given PromQL query by modifying the query
+// to include only those labels that are allowed for a particular tenant. It takes a PromQL query
+// as a string and a map where keys are tenant labels and values are booleans.
+// If the query is empty, it is set to include all allowed tenant labels.
+// The function then parses the PromQL query and extracts labels and values from the parsed query.
+// It enforces label restrictions and applies the enforced labels to the query using an enforcer.
+// It returns the enforced query as a string and an error if any occurs during the process.
 func promqlEnforcer(query string, allowedTenantLabels map[string]bool) (string, error) {
 	currentTime := time.Now()
 	if query == "" {
@@ -74,8 +76,9 @@ func promqlEnforcer(query string, allowedTenantLabels map[string]bool) (string, 
 	return expr.String(), nil
 }
 
-// extractLabelsAndValues inspects a given expression and extracts label names and values
-// from vector selectors. It returns a map of label names to their corresponding values.
+// extractLabelsAndValues takes a PromQL expression and traverses the expression tree to extract
+// all labels and their corresponding values. It returns a map where keys are labels and values
+// are their corresponding values. If an error occurs during the process, it returns an error.
 func extractLabelsAndValues(expr parser.Expr) (map[string]string, error) {
 	l := make(map[string]string)
 	parser.Inspect(expr, func(node parser.Node, path []parser.Node) error {
@@ -89,10 +92,11 @@ func extractLabelsAndValues(expr parser.Expr) (map[string]string, error) {
 	return l, nil
 }
 
-// enforceLabels enforces the given query labels based on allowed tenant labels. If a label
-// exists in the query that matches the Thanos tenant label in the config, it checks the label
-// against allowed tenant labels. If the check fails, it returns an error. If no label matches
-// the Thanos tenant label, it returns all allowed tenant labels.
+// enforceLabels takes a map where keys are labels from a query and their values, and a map where keys
+// are allowed tenant labels and values are booleans. It checks if the tenant label exists in the
+// query labels. If it does, it verifies that all of its values exist in the allowed tenant labels map.
+// If the tenant label does not exist in the query labels, it returns all values from the allowed tenant
+// labels map. If it encounters a tenant that is not allowed during the process, it returns an error.
 func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool) ([]string, error) {
 	if _, ok := queryLabels[Cfg.Thanos.TenantLabel]; ok {
 		ok, tenantLabels := checkLabels(queryLabels, allowedTenantLabels)
@@ -105,9 +109,8 @@ func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string
 	return MapKeysToArray(allowedTenantLabels), nil
 }
 
-// checkLabels checks query labels against allowed tenant labels. If a query label does not exist
-// in allowed tenant labels, it returns false along with the query label. If all query labels exist
-// in allowed tenant labels, it returns true along with the query labels.
+// checkLabels checks if all query labels are within the allowed tenant labels.
+// Returns a boolean indicating success, and the checked labels.
 func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool) (bool, []string) {
 	splitQueryLabels := strings.Split(queryLabels[Cfg.Thanos.TenantLabel], "|")
 	for _, queryLabel := range splitQueryLabels {
@@ -119,10 +122,7 @@ func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]b
 	return true, splitQueryLabels
 }
 
-// createEnforcer creates a new Enforcer with a matcher that matches tenant labels. If there are
-// multiple tenant labels, it uses a regexp match type, else it uses an equal match type. The matcher
-// name is set to the Thanos tenant label in the config and the value is set to the tenant labels
-// joined by a pipe character.
+// createEnforcer creates and returns a label enforcer with a matcher containing tenant labels.
 func createEnforcer(tenantLabels []string) *enforcer.Enforcer {
 	var matchType labels.MatchType
 	if len(tenantLabels) > 1 {

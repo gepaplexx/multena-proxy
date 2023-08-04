@@ -9,12 +9,13 @@ import (
 	"time"
 )
 
-// logqlEnforcer enforces the LogQL query based on tenant labels. If the query is empty,
-// it sets a default query. It parses the provided query and walks through the expressions,
-// looking for stream match expressions. If a stream match expression is found, it updates
-// the matchers to match the tenant's labels. If no namespace matchers are found in the query,
-// it returns an error (namespace should be set in matchNamespaceMatcher therefore it's a validation).
-// If all is well, it logs the processed query and returns it.
+// logqlEnforcer enforces tenant restrictions on a given LogQL query by modifying the query
+// to include only those labels that are allowed for a particular tenant. It takes a LogQL query
+// as a string and a map where keys are tenant labels and values are booleans.
+// If the query is empty, it is set to "{__name__=~\".+\"}".
+// The function then parses the LogQL query and walks through the parsed query to match and enforce
+// tenant label restrictions.
+// It returns the enforced query as a string and an error if any occurs during the process.
 func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 	currentTime := time.Now()
 	if query == "" {
@@ -51,11 +52,12 @@ func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
 	return expr.String(), nil
 }
 
-// matchNamespaceMatchers updates matchers based on tenantLabels. If the match name equals
-// the configured Loki tenant label, it checks if the match value exists in tenantLabels.
-// If a match value does not exist in tenantLabels, it returns an error. If no namespace
-// matchers are found in queryMatches, it adds a matcher that matches tenantLabels.
-// It returns the updated matchers.
+// matchNamespaceMatchers takes a slice of label matchers from a LogQL query and a map where keys
+// are tenant labels and values are booleans. It checks if the tenant label exists in the matchers,
+// and if it does, it verifies that all of its values exist in the tenant labels map. If the tenant
+// label does not exist in the matchers, it adds it to the matchers along with all values from the
+// tenant labels map. If it encounters an unauthorized namespace during the process, it returns an
+// error. If everything goes well, it returns the updated matchers slice and nil error.
 func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[string]bool) ([]*labels.Matcher, error) {
 	foundNamespace := false
 	for _, match := range queryMatches {

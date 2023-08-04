@@ -89,9 +89,9 @@ type Config struct {
 	Groups map[string][]string `mapstructure:"groups"`
 }
 
-// init carries out the main initialization routine for the Proxy. It logs the commit information,
-// configures the HTTP client to ignore self-signed certificates, reads the service account token,
-// initializes JWKS if not in development mode, and establishes a database connection if enabled in the config.
+// init is an in-built function that gets called before the main function. It performs initializations needed
+// for the service such as initializing logging, loading configuration, and setting up services like JWKS
+// and database based on the loaded configuration.
 func init() {
 	initLogging()
 	initConfig()
@@ -136,7 +136,8 @@ func init() {
 
 }
 
-// initConfig initializes the configuration from the files `config` and `labels` using Viper.
+// initConfig initializes the configuration object (Cfg) and sets up the viper object (V) with the correct
+// configuration files and paths. It loads the necessary configuration files based on the tenant provider setting.
 func initConfig() {
 	Cfg = &Config{}
 	V = viper.NewWithOptions(viper.KeyDelimiter("::"))
@@ -146,8 +147,9 @@ func initConfig() {
 	}
 }
 
-// onConfigChange is a callback that gets triggered when a configuration file changes.
-// It reloads the configuration from the files `config` and `labels`.
+// onConfigChange is a callback function that reloads the configuration when any changes are detected in the
+// configuration files. It also triggers updating of services such as JWKS and logging levels based on the new
+// configuration.
 func onConfigChange(e fsnotify.Event) {
 	//Todo: change log level on reload
 	Cfg = &Config{}
@@ -176,8 +178,8 @@ func onConfigChange(e fsnotify.Event) {
 	initJWKS()
 }
 
-// loadConfig loads the configuration from the specified file. It looks for the config file
-// in the `/etc/config/` directory and the `./configs` directory.
+// loadConfig reads in a configuration file of a given name and merges it with existing configuration.
+// It also sets up a watch on the configuration file for any changes.
 func loadConfig(configName string) {
 	V.SetConfigName(configName) // name of config file (without extension)
 	V.SetConfigType("yaml")
@@ -196,7 +198,8 @@ func loadConfig(configName string) {
 	V.WatchConfig()
 }
 
-// initLogging initializes the logger based on the log level specified in the config file.
+// initLogging sets up the global logging object (Logger) with the specified logging level and configuration.
+// It returns the Logger object.
 func initLogging() *zap.Logger {
 	atomicLevel = zap.NewAtomicLevel()
 	atomicLevel.SetLevel(getZapLevel("info"))
@@ -227,6 +230,7 @@ func initLogging() *zap.Logger {
 	return Logger
 }
 
+// getZapLevel translates a string representation of a logging level into a zapcore.Level.
 func getZapLevel(level string) zapcore.Level {
 	switch level {
 	case "debug":
@@ -244,10 +248,13 @@ func getZapLevel(level string) zapcore.Level {
 	}
 }
 
+// updateLogLevel updates the global logging level based on the logging level specified in the configuration.
 func updateLogLevel() {
 	atomicLevel.SetLevel(getZapLevel(strings.ToLower(Cfg.Log.Level)))
 }
 
+// initTLSConfig sets up the global HTTP client's TLS configuration. This includes adding trusted CAs and
+// client certificates from the configuration and handling self-signed certificates.
 func initTLSConfig() {
 	rootCAs, _ := x509.SystemCertPool()
 	if rootCAs == nil {
@@ -307,8 +314,7 @@ func initTLSConfig() {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = config
 }
 
-// initJWKS initializes the JWKS (JSON Web Key Set) from a specified URL. It sets up the refresh parameters
-// for the JWKS and handles any errors that occur during the refresh.
+// initJWKS sets up the JWKS service for validating JWT tokens. It uses the JWKS endpoint specified in the configuration.
 func initJWKS() {
 	Logger.Info("Init Keycloak config")
 	jwksURL := Cfg.Web.JwksCertURL
@@ -334,9 +340,7 @@ func initJWKS() {
 	Logger.Info("Finished Keycloak config")
 }
 
-// initDB establishes a connection to the database if the `Db.Enabled` configuration setting is `true`.
-// It reads the database password from a file, sets up the database connection configuration,
-// and opens the database connection.
+// initDB sets up a global database connection using the database configuration provided in the configuration file.
 func initDB() {
 	password, err := os.ReadFile(Cfg.Db.PasswordPath)
 	if err != nil {
@@ -356,5 +360,4 @@ func initDB() {
 		Logger.Panic("Error opening DB connection", zap.Error(err))
 
 	}
-
 }
