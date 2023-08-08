@@ -1,10 +1,11 @@
 package main
 
 import (
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
 // enforce is a function that enforces tenant restrictions on the provided HTTP request.

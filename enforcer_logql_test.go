@@ -1,9 +1,10 @@
 package main
 
 import (
+	"testing"
+
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestLogqlEnforcer(t *testing.T) {

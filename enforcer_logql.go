@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	logqlv2 "github.com/observatorium/api/logql/v2"
 	"github.com/prometheus/prometheus/model/labels"
 	"go.uber.org/zap"
-	"strings"
-	"time"
 )
 
 // logqlEnforcer enforces tenant restrictions on a given LogQL query by modifying the query

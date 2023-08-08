@@ -2,8 +2,9 @@ package main
 
 import (
 	"database/sql"
-	"go.uber.org/zap"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
 // GetLabelsCM function extracts the namespaces associated with a user and their groups

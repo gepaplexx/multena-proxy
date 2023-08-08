@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	enforcer "github.com/prometheus-community/prom-label-proxy/injectproxy"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql/parser"
 	"go.uber.org/zap"
-	"strings"
-	"time"
 )
 
 // promqlEnforcer enforces tenant restrictions on a given PromQL query by modifying the query

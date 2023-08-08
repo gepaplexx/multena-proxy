@@ -6,18 +6,19 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/MicahParks/keyfunc/v2"
-	"github.com/fsnotify/fsnotify"
-	"github.com/go-sql-driver/mysql"
-	"github.com/spf13/viper"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/MicahParks/keyfunc/v2"
+	"github.com/fsnotify/fsnotify"
+	"github.com/go-sql-driver/mysql"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var (
@@ -133,7 +134,6 @@ func init() {
 	}
 
 	Logger.Info("------Init Complete------")
-
 }
 
 // initConfig initializes the configuration object (Cfg) and sets up the viper object (V) with the correct
@@ -151,7 +151,7 @@ func initConfig() {
 // configuration files. It also triggers updating of services such as JWKS and logging levels based on the new
 // configuration.
 func onConfigChange(e fsnotify.Event) {
-	//Todo: change log level on reload
+	// Todo: change log level on reload
 	Cfg = &Config{}
 	var configs []string
 	if Cfg.TenantProvider == "configmap" {
@@ -281,7 +281,6 @@ func initTLSConfig() {
 
 			return nil
 		})
-
 		if err != nil {
 			Logger.Error("Error while traversing directory", zap.Error(err))
 		}
@@ -358,6 +357,5 @@ func initDB() {
 	DB, err = sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		Logger.Panic("Error opening DB connection", zap.Error(err))
-
 	}
 }

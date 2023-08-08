@@ -8,12 +8,13 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 func genJWKS(username, email string, groups []string, pk *ecdsa.PrivateKey) (string, error) {
@@ -120,7 +121,7 @@ func setupTestMain() map[string]string {
 			return
 		}
 	}))
-	//defer jwksServer.Close()
+	// defer jwksServer.Close()
 	Cfg.Web.JwksCertURL = jwksServer.URL
 	initJWKS()
 
@@ -131,7 +132,7 @@ func setupTestMain() map[string]string {
 			return
 		}
 	}))
-	//defer upstreamServer.Close()
+	// defer upstreamServer.Close()
 	Cfg.Thanos.URL = upstreamServer.URL
 	Cfg.Loki.URL = upstreamServer.URL
 	Cfg.Thanos.TenantLabel = "tenant_id"

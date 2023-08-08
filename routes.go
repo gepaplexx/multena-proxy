@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+
+	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Route struct defines a route in the application with a URL and a matching word for label enforcement.
@@ -31,14 +32,15 @@ type Datasource struct {
 type contextKey string
 
 // DatasourceKey and KeycloakCtxToken are the context keys used in the application.
-const DatasourceKey contextKey = "datasource"
-const KeycloakCtxToken contextKey = "keycloakToken"
+const (
+	DatasourceKey    contextKey = "datasource"
+	KeycloakCtxToken contextKey = "keycloakToken"
+)
 
 // application function initializes the application's HTTP router. It configures routes for the Loki and Thanos APIs,
 // and applies middleware for logging, authentication, and setting the data source in the request context.
 // It returns an external router, an internal router, and an error.
 func application() (*mux.Router, *mux.Router, error) {
-
 	lokiUrl, err := url.Parse(Cfg.Loki.URL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing Loki URL: %v", err)
