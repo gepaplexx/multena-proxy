@@ -10,14 +10,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// logqlEnforcer enforces tenant restrictions on a given LogQL query by modifying the query
-// to include only those labels that are allowed for a particular tenant. It takes a LogQL query
-// as a string and a map where keys are tenant labels and values are booleans.
-// If the query is empty, it is set to "{__name__=~\".+\"}".
-// The function then parses the LogQL query and walks through the parsed query to match and enforce
-// tenant label restrictions.
-// It returns the enforced query as a string and an error if any occurs during the process.
-func logqlEnforcer(query string, tenantLabels map[string]bool) (string, error) {
+type LogQLEnforcer Request
+
+func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool) (string, error) {
 	currentTime := time.Now()
 	if query == "" {
 		query = "{__name__=~\".+\"}"

@@ -4,11 +4,67 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go.uber.org/zap/zapcore"
 	"io"
 	"net/http"
+	"runtime"
+	"strings"
 
 	"go.uber.org/zap"
 )
+
+var Logger *zap.Logger
+var Level zap.AtomicLevel
+
+func NewLogger() {
+	Level = zap.NewAtomicLevel()
+	Level.SetLevel(getZapLevel("info"))
+
+	rawJSON := []byte(`{
+		"level": "info",
+		"encoding": "json",
+		"outputPaths": ["stdout"],
+		"errorOutputPaths": ["stdout"],
+		"encoderConfig": {
+		  "messageKey": "msg",
+		  "levelKey": "level",
+		  "levelEncoder": "lowercase"
+		}
+	  }`)
+
+	var cfg zap.Config
+	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
+		panic(err)
+	}
+	Logger = zap.Must(cfg.Build())
+
+	Logger.Debug("log construction succeeded")
+	Logger.Debug("Go Version", zap.String("version", runtime.Version()))
+	Logger.Debug("Go OS/Arch", zap.String("os", runtime.GOOS), zap.String("arch", runtime.GOARCH))
+	Logger.Debug("Config", zap.Any("cfg", cfg))
+}
+
+// getZapLevel translates a string representation of a logging level into a zapcore.Level.
+func getZapLevel(level string) zapcore.Level {
+	switch level {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	case "fatal":
+		return zapcore.FatalLevel
+	default: // unknown level or not set, default to info
+		return zapcore.InfoLevel
+	}
+}
+
+func (a *App) UpdateLogLevel() {
+	Level.SetLevel(getZapLevel(strings.ToLower(a.Cfg.Log.Level)))
+}
 
 // requestData structure contains information about a HTTP request.
 type requestData struct {
@@ -18,12 +74,10 @@ type requestData struct {
 	Body   string      `json:"body"`
 }
 
-// loggingMiddleware function is like a security camera at the entrance of a building (the server),
-// it records the details of everyone (requests) that comes in. It can either record everything or hide sensitive details.
-func loggingMiddleware(next http.Handler) http.Handler {
+func (a *App) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var bodyBytes []byte
-		if Cfg.Log.LogTokens {
+		if a.Cfg.Log.LogTokens {
 			bodyBytes = readBody(r)
 		} else {
 			bodyBytes = []byte("[REDACTED]")

@@ -11,14 +11,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// promqlEnforcer enforces tenant restrictions on a given PromQL query by modifying the query
-// to include only those labels that are allowed for a particular tenant. It takes a PromQL query
-// as a string and a map where keys are tenant labels and values are booleans.
-// If the query is empty, it is set to include all allowed tenant labels.
-// The function then parses the PromQL query and extracts labels and values from the parsed query.
-// It enforces label restrictions and applies the enforced labels to the query using an enforcer.
-// It returns the enforced query as a string and an error if any occurs during the process.
-func promqlEnforcer(query string, allowedTenantLabels map[string]bool) (string, error) {
+type PromQLRequest Request
+
+func (pqr PromQLRequest) EnforceQL(query string, allowedTenantLabels map[string]bool) (string, error) {
 	currentTime := time.Now()
 	if query == "" {
 		operator := "="

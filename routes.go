@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
@@ -17,36 +16,21 @@ type Route struct {
 	MatchWord string
 }
 
-// EnforceFunc is a function type that enforces tenant restrictions on a string given a map of tenant labels.
-// It returns a string and an error.
-type EnforceFunc func(string, map[string]bool) (string, error)
-
-// Datasource struct represents a data source with an upstream URL, an EnforceFunc function, and a UseMutualTLS flag.
-type Datasource struct {
-	UpstreamURL  *url.URL
-	EnforceFunc  EnforceFunc
-	UseMutualTLS bool
-}
-
 // contextKey is a string type that represents a context key.
 type contextKey string
 
-// DatasourceKey and KeycloakCtxToken are the context keys used in the application.
+// KeycloakCtxToken are the context keys used in the application.
 const (
-	DatasourceKey    contextKey = "datasource"
 	KeycloakCtxToken contextKey = "keycloakToken"
 )
 
-// application function initializes the application's HTTP router. It configures routes for the Loki and Thanos APIs,
-// and applies middleware for logging, authentication, and setting the data source in the request context.
-// It returns an external router, an internal router, and an error.
-func application() (*mux.Router, *mux.Router, error) {
-	lokiUrl, err := url.Parse(Cfg.Loki.URL)
+func (a *App) NewRoutes() (*mux.Router, *mux.Router, error) {
+	lokiUrl, err := url.Parse(a.Cfg.Loki.URL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing Loki URL: %v", err)
 	}
 
-	thanosUrl, err := url.Parse(Cfg.Thanos.URL)
+	thanosUrl, err := url.Parse(a.Cfg.Thanos.URL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing Thanos URL: %v", err)
 	}
@@ -75,36 +59,43 @@ func application() (*mux.Router, *mux.Router, error) {
 	lokiRouter := e.PathPrefix("/loki").Subrouter()
 	thanosRouter := e.PathPrefix("").Subrouter()
 
-	lokiRouter.Use(setDatasource(Datasource{
-		UpstreamURL:  lokiUrl,
-		EnforceFunc:  logqlEnforcer,
-		UseMutualTLS: Cfg.Loki.UseMutualTLS,
-	}))
-	thanosRouter.Use(setDatasource(Datasource{
-		UpstreamURL:  thanosUrl,
-		EnforceFunc:  promqlEnforcer,
-		UseMutualTLS: Cfg.Thanos.UseMutualTLS,
-	}))
-
-	e.Use(loggingMiddleware)
+	e.Use(a.loggingMiddleware)
 	e.Use(authMiddleware)
 
 	for _, route := range routes {
-		handleRoute(lokiRouter, route)
-		handleRoute(thanosRouter, route)
+
+		lokiRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
+			req := Request{route.MatchWord, w, r, LogQLEnforcer{}}
+			err := req.enforce(ConfigMapProvider{
+				Users:  nil,
+				Groups: nil,
+			})
+			if err != nil {
+				return
+			}
+			req.callUpstream(thanosUrl, Cfg.Thanos.UseMutualTLS)
+		})
+
+		thanosRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
+			req := Request{route.MatchWord, w, r, PromQLRequest{}}
+			err := req.enforce(ConfigMapProvider{
+				Users:  nil,
+				Groups: nil,
+			})
+			if err != nil {
+				return
+			}
+			req.callUpstream(lokiUrl, Cfg.Loki.UseMutualTLS)
+		})
 	}
 
 	e.SkipClean(true)
 	return e, i, nil
 }
 
-// setDatasource function is a middleware that sets a Datasource in the request context.
-// It takes a Datasource and returns a middleware function.
-func setDatasource(ds Datasource) mux.MiddlewareFunc {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), DatasourceKey, ds)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
+// HealthCheckHandler is a HTTP handler function that always responds with
+// HTTP status code 200 and body "Ok". It is typically used for health check endpoints.
+func HealthCheckHandler(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("Ok"))
 }

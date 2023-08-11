@@ -10,43 +10,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// KeycloakToken struct represents the structure of a Keycloak JWT token. It holds
-// the various details associated with a user.
 type KeycloakToken struct {
-	AuthTime       int      `json:"auth_time,omitempty"`
-	SessionState   string   `json:"session_state"`
-	Acr            string   `json:"acr"`
-	AllowedOrigins []string `json:"allowed-origins"`
-	RealmAccess    struct {
-		Roles []string `json:"roles"`
-	} `json:"realm_access"`
-	ResourceAccess struct {
-		RealmManagement struct {
-			Roles []string `json:"roles"`
-		} `json:"realm-management"`
-		Broker struct {
-			Roles []string `json:"roles"`
-		} `json:"broker"`
-		Account struct {
-			Roles []string `json:"roles"`
-		} `json:"account"`
-	} `json:"resource_access"`
-	Scope             string   `json:"scope"`
-	Sid               string   `json:"sid"`
-	EmailVerified     bool     `json:"email_verified"`
-	Name              string   `json:"name"`
-	Groups            []string `json:"groups"`
-	ApaGroupsOrg      []string `json:"apa/groups_org"`
+	Groups            []string `json:"-"`
 	PreferredUsername string   `json:"preferred_username"`
-	GivenName         string   `json:"given_name"`
-	FamilyName        string   `json:"family_name"`
 	Email             string   `json:"email"`
 	jwt.RegisteredClaims
 }
 
-// authMiddleware function is a special function that checks the requestor's ticket (authToken)
-// before allowing them to enter the server. If the ticket isn't valid, they are not allowed in.
-func authMiddleware(next http.Handler) http.Handler {
+func (a *App) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authToken, err := getBearerToken(r)
 		if err != nil {
@@ -54,13 +25,13 @@ func authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		keycloakToken, token, err := parseJwtToken(authToken)
-		if err != nil && !Cfg.Dev.Enabled {
+		keycloakToken, token, err := parseJwtToken(authToken, a)
+		if err != nil && !a.Cfg.Dev.Enabled {
 			logAndWriteError(w, http.StatusForbidden, err, "error parsing Keycloak token\n")
 			return
 		}
 
-		if !isValidToken(token) {
+		if !isValidToken(token, *a.Cfg) {
 			logAndWriteError(w, http.StatusForbidden, nil, "invalid token")
 			return
 		}
@@ -70,8 +41,6 @@ func authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// getBearerToken function checks for a special 'Authorization' ticket in the request.
-// If it's not present or incorrect, it reports an error.
 func getBearerToken(r *http.Request) (string, error) {
 	authToken := r.Header.Get("Authorization")
 	if authToken == "" {
@@ -84,33 +53,49 @@ func getBearerToken(r *http.Request) (string, error) {
 	return strings.TrimSpace(splitToken[1]), nil
 }
 
-// parseJwtToken function tries to understand the details of the ticket (JWT token).
-// It checks whether the ticket is genuine and has not been tampered with.
-func parseJwtToken(tokenString string) (KeycloakToken, *jwt.Token, error) {
-	keycloakToken := KeycloakToken{}
-	token, err := jwt.ParseWithClaims(tokenString, keycloakToken, func(token *jwt.Token) (interface{}, error) {
+func parseJwtToken(tokenString string, a *App) (KeycloakToken, *jwt.Token, error) {
+	var keycloakToken KeycloakToken
+
+	var claimsMap jwt.MapClaims
+	parseFunc := func(token *jwt.Token) (interface{}, error) {
 		return nil, fmt.Errorf("unable to verify token")
-	})
-	if !Cfg.Dev.Enabled {
-		token, err = jwt.ParseWithClaims(tokenString, &keycloakToken, Jwks.Keyfunc)
 	}
+
+	if !a.Cfg.Dev.Enabled {
+		parseFunc = a.Jwks.Keyfunc
+	}
+
+	token, err := jwt.ParseWithClaims(tokenString, &claimsMap, parseFunc)
+	if err != nil {
+		return keycloakToken, nil, err
+	}
+
+	if v, ok := claimsMap["preferred_username"].(string); ok {
+		keycloakToken.PreferredUsername = v
+	}
+	if v, ok := claimsMap["email"].(string); ok {
+		keycloakToken.Email = v
+	}
+
+	if v, ok := claimsMap[a.Cfg.Web.KeycloakTokenGroupName].([]interface{}); ok {
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				keycloakToken.Groups = append(keycloakToken.Groups, s)
+			}
+		}
+	}
+
 	return keycloakToken, token, err
 }
 
-// isValidToken function checks whether the ticket (token) is still valid.
-// Even if the ticket is genuine, it might be expired, in which case it won't be valid.
-func isValidToken(token *jwt.Token) bool {
-	return token.Valid || Cfg.Dev.Enabled
+func isValidToken(token *jwt.Token, cfg Config) bool {
+	return token.Valid || cfg.Dev.Enabled
 }
 
-// isAdmin function checks whether the user is an admin or not based on their ticket (token).
-// Admins have special permissions and access in the server.
-func isAdmin(token KeycloakToken) bool {
-	return (ContainsIgnoreCase(token.Groups, Cfg.Admin.Group) || ContainsIgnoreCase(token.ApaGroupsOrg, Cfg.Admin.Group)) && Cfg.Admin.Bypass
+func isAdmin(token KeycloakToken, cfg Config) bool {
+	return ContainsIgnoreCase(token.Groups, cfg.Admin.Group) && cfg.Admin.Bypass
 }
 
-// requestWithContext function takes the ticket (token) and attaches it to the request,
-// so it's easier to find and check it later.
 func requestWithContext(r *http.Request, keycloakToken KeycloakToken) *http.Request {
 	ctx := context.WithValue(r.Context(), KeycloakCtxToken, keycloakToken)
 	return r.WithContext(ctx)

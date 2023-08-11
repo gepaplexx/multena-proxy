@@ -10,7 +10,8 @@ web:
   host: localhost
   insecure_skip_verify: true
   trusted_root_ca_path: "./certs/"
-  jwks_cert_url: https://example.com/realms/internal/protocol/openid-connect/certs
+  jwks_cert_url: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
+  service_account_token: "fake"
 
 admin:
   bypass: true
@@ -19,7 +20,7 @@ admin:
 dev:
   enabled: false
   username: example
-  service_account_token: "fake"
+
 
 db:
   enabled: false
