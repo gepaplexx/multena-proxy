@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
 type Enforcer interface {

@@ -4,14 +4,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/MicahParks/keyfunc/v2"
-	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/viper"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/MicahParks/keyfunc/v2"
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
 
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"

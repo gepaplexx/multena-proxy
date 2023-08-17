@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
+	"strings"
+
 	enforcer "github.com/prometheus-community/prom-label-proxy/injectproxy"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql/parser"
-	"strings"
 )
 
 type PromQLRequest Request

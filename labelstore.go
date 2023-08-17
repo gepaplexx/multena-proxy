@@ -3,17 +3,18 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"os"
-	"strings"
 )
 
 type Labelstore interface {
 	Connect(App) error
-	//Close() error
+	// Close() error
 	GetLabels(token KeycloakToken) map[string]bool
 }
 
@@ -27,7 +28,6 @@ func (a *App) WithLabelStore() {
 		Logger.Panic("Unknown labelstore type", zap.String("type", a.Cfg.LabelStore.typ))
 	}
 	err := a.LabelStore.Connect(*a)
-
 	if err != nil {
 		Logger.Panic("Error connecting to labelstore", zap.Error(err))
 	}
@@ -64,7 +64,6 @@ func (c *ConfigMapHandler) Connect(a App) error {
 		if err != nil {
 			Logger.Panic("Error while unmarshalling config file", zap.Error(err))
 		}
-
 	})
 	v.WatchConfig()
 	c.convert()
@@ -91,11 +90,11 @@ func (c *ConfigMapHandler) GetLabels(token KeycloakToken) map[string]bool {
 	username := token.PreferredUsername
 	groups := token.Groups
 	mergedNamespaces := make(map[string]bool, len(c.converted[username])*2)
-	for k, _ := range c.converted[username] {
+	for k := range c.converted[username] {
 		mergedNamespaces[k] = true
 	}
 	for _, group := range groups {
-		for k, _ := range c.converted[group] {
+		for k := range c.converted[group] {
 			mergedNamespaces[k] = true
 		}
 	}

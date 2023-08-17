@@ -4,17 +4,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap/zapcore"
 	"io"
 	"net/http"
 	"runtime"
 	"strings"
 
+	"go.uber.org/zap/zapcore"
+
 	"go.uber.org/zap"
 )
 
-var Logger *zap.Logger
-var Level zap.AtomicLevel
+var (
+	Logger *zap.Logger
+	Level  zap.AtomicLevel
+)
 
 func init() {
 	Level = zap.NewAtomicLevel()

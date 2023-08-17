@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"strings"
+
 	logqlv2 "github.com/observatorium/api/logql/v2"
 	"github.com/prometheus/prometheus/model/labels"
-	"strings"
 )
 
 type LogQLEnforcer Request
