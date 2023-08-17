@@ -27,19 +27,20 @@ func genJWKS(username, email string, groups []string, pk *ecdsa.PrivateKey) (str
 	return token.SignedString(pk)
 }
 
-func setupTestMain() map[string]string {
+func setupTestMain() (App, map[string]string) {
+	Level.SetLevel(zap.DebugLevel)
 	// Generate a new private key.
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		fmt.Printf("Failed to generate private key: %s\n", err)
-		return nil
+		return App{}, nil
 	}
 
 	// Encode the private key to PEM format.
 	privateKeyBytes, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
 		fmt.Printf("Failed to marshal private key: %s\n", err)
-		return nil
+		return App{}, nil
 	}
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "EC PRIVATE KEY",
@@ -50,7 +51,7 @@ func setupTestMain() map[string]string {
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
 		fmt.Printf("Failed to marshal public key: %s\n", err)
-		return nil
+		return App{}, nil
 	}
 	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "PUBLIC KEY",
@@ -121,9 +122,11 @@ func setupTestMain() map[string]string {
 			return
 		}
 	}))
+	app := App{}
+	app.WithConfig()
 	// defer jwksServer.Close()
-	Cfg.Web.JwksCertURL = jwksServer.URL
-	initJWKS()
+	app.Cfg.Web.JwksCertURL = jwksServer.URL
+	app.WithJWKS()
 
 	// Set up the upstream server
 	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -133,19 +136,27 @@ func setupTestMain() map[string]string {
 		}
 	}))
 	// defer upstreamServer.Close()
-	Cfg.Thanos.URL = upstreamServer.URL
-	Cfg.Loki.URL = upstreamServer.URL
-	Cfg.Thanos.TenantLabel = "tenant_id"
-	Cfg.Loki.TenantLabel = "tenant_id"
+	app.Cfg.Thanos.URL = upstreamServer.URL
+	app.Cfg.Loki.URL = upstreamServer.URL
+	app.Cfg.Thanos.TenantLabel = "tenant_id"
+	app.Cfg.Loki.TenantLabel = "tenant_id"
 
-	Cfg.Users["user"] = []string{"allowed_user", "also_allowed_user"}
-	Cfg.Groups["group1"] = []string{"allowed_group1", "also_allowed_group1"}
-	Cfg.Groups["group2"] = []string{"allowed_group2", "also_allowed_group2"}
-	return tokens
+	cmh := ConfigMapHandler{
+		Users: map[string][]string{"user": {"allowed_user", "also_allowed_user"}},
+		Groups: map[string][]string{
+			"group1": {"allowed_group1", "also_allowed_group1"},
+			"group2": {"allowed_group2", "also_allowed_group2"},
+		},
+	}
+	cmh.convert()
+
+	app.LabelStore = &cmh
+
+	return app, tokens
 }
 
 func Test_reverseProxy(t *testing.T) {
-	tokens := setupTestMain()
+	app, tokens := setupTestMain()
 
 	cases := []struct {
 		name             string
@@ -283,7 +294,7 @@ func Test_reverseProxy(t *testing.T) {
 		},
 	}
 
-	r, _, err := application()
+	r, _, err := app.NewRoutes()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,12 +333,15 @@ func Test_reverseProxy(t *testing.T) {
 func TestIsAdminSkip(t *testing.T) {
 	a := assert.New(t)
 
-	token := &KeycloakToken{Groups: []string{"gepardec-run-admins"}, ApaGroupsOrg: []string{"gepardec-run-admins"}}
-	a.True(isAdmin(*token))
+	app := App{}
+	app.WithConfig()
+	app.Cfg.Admin.Bypass = true
+	app.Cfg.Admin.Group = "gepardec-run-admins"
+	token := &KeycloakToken{Groups: []string{"gepardec-run-admins"}}
+	a.True(isAdmin(*token, *app.Cfg))
 
 	token.Groups = []string{"user"}
-	token.ApaGroupsOrg = []string{"org"}
-	a.False(isAdmin(*token))
+	a.False(isAdmin(*token, *app.Cfg))
 }
 
 func TestLogAndWriteError(t *testing.T) {

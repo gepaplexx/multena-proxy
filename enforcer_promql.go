@@ -2,73 +2,46 @@ package main
 
 import (
 	"fmt"
-	"strings"
-	"time"
-
 	enforcer "github.com/prometheus-community/prom-label-proxy/injectproxy"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql/parser"
-	"go.uber.org/zap"
+	"strings"
 )
 
 type PromQLRequest Request
 
-func (pqr PromQLRequest) EnforceQL(query string, allowedTenantLabels map[string]bool) (string, error) {
-	currentTime := time.Now()
+func (pqr PromQLRequest) EnforceQL(query string, allowedTenantLabels map[string]bool, labelMatch string) (string, error) {
 	if query == "" {
 		operator := "="
 		if len(allowedTenantLabels) > 1 {
 			operator = "=~"
 		}
 		query = fmt.Sprintf("{%s%s\"%s\"}",
-			Cfg.Thanos.TenantLabel,
+			labelMatch,
 			operator,
 			strings.Join(MapKeysToArray(allowedTenantLabels),
 				"|"))
 	}
-	Logger.Debug("Start promqlEnforcer", zap.String("query", query), zap.Time("time", currentTime))
 	expr, err := parser.ParseExpr(query)
 	if err != nil {
-		Logger.Error("error",
-			zap.Error(err),
-			zap.String("info", "parsing query"))
 		return "", err
 	}
-
-	Logger.Info("long term query collection",
-		zap.String("ltqc", expr.String()),
-		zap.Time("time", currentTime))
 
 	queryLabels, err := extractLabelsAndValues(expr)
 	if err != nil {
-		Logger.Error("error",
-			zap.Error(err),
-			zap.String("info", "extracting labels"))
 		return "", err
 	}
 
-	tenantLabels, err := enforceLabels(queryLabels, allowedTenantLabels)
+	tenantLabels, err := enforceLabels(queryLabels, allowedTenantLabels, labelMatch)
 	if err != nil {
-		Logger.Error("error",
-			zap.Error(err),
-			zap.String("info", "enforcing labels"))
 		return "", err
 	}
 
-	labelEnforcer := createEnforcer(tenantLabels)
+	labelEnforcer := createEnforcer(tenantLabels, labelMatch)
 	err = labelEnforcer.EnforceNode(expr)
 	if err != nil {
-		Logger.Error("error",
-			zap.Error(err))
 		return "", err
 	}
-
-	Logger.Debug("expr",
-		zap.String("expr", expr.String()),
-		zap.String("tl", strings.Join(tenantLabels, "|")))
-	Logger.Info("long term query collection processed",
-		zap.String("ltqcp", expr.String()),
-		zap.Time("time", currentTime))
 	return expr.String(), nil
 }
 
@@ -93,9 +66,9 @@ func extractLabelsAndValues(expr parser.Expr) (map[string]string, error) {
 // query labels. If it does, it verifies that all of its values exist in the allowed tenant labels map.
 // If the tenant label does not exist in the query labels, it returns all values from the allowed tenant
 // labels map. If it encounters a tenant that is not allowed during the process, it returns an error.
-func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool) ([]string, error) {
-	if _, ok := queryLabels[Cfg.Thanos.TenantLabel]; ok {
-		ok, tenantLabels := checkLabels(queryLabels, allowedTenantLabels)
+func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool, labelMatch string) ([]string, error) {
+	if _, ok := queryLabels[labelMatch]; ok {
+		ok, tenantLabels := checkLabels(queryLabels, allowedTenantLabels, labelMatch)
 		if !ok {
 			return nil, fmt.Errorf("user not allowed with namespace %s", tenantLabels[0])
 		}
@@ -107,8 +80,8 @@ func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string
 
 // checkLabels checks if all query labels are within the allowed tenant labels.
 // Returns a boolean indicating success, and the checked labels.
-func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool) (bool, []string) {
-	splitQueryLabels := strings.Split(queryLabels[Cfg.Thanos.TenantLabel], "|")
+func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool, labelMatch string) (bool, []string) {
+	splitQueryLabels := strings.Split(queryLabels[labelMatch], "|")
 	for _, queryLabel := range splitQueryLabels {
 		_, ok := allowedTenantLabels[queryLabel]
 		if !ok {
@@ -119,7 +92,7 @@ func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]b
 }
 
 // createEnforcer creates and returns a label enforcer with a matcher containing tenant labels.
-func createEnforcer(tenantLabels []string) *enforcer.Enforcer {
+func createEnforcer(tenantLabels []string, labelMatch string) *enforcer.Enforcer {
 	var matchType labels.MatchType
 	if len(tenantLabels) > 1 {
 		matchType = labels.MatchRegexp
@@ -128,7 +101,7 @@ func createEnforcer(tenantLabels []string) *enforcer.Enforcer {
 	}
 
 	return enforcer.NewEnforcer(true, &labels.Matcher{
-		Name:  Cfg.Thanos.TenantLabel,
+		Name:  labelMatch,
 		Type:  matchType,
 		Value: strings.Join(tenantLabels, "|"),
 	})

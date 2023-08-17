@@ -36,8 +36,9 @@ func (a *App) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		newReq := requestWithContext(r, keycloakToken)
-		next.ServeHTTP(w, newReq)
+		r = withSkipContext(r, isAdmin(keycloakToken, *a.Cfg))
+		r = withKeyCloakContext(r, keycloakToken)
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -84,7 +85,6 @@ func parseJwtToken(tokenString string, a *App) (KeycloakToken, *jwt.Token, error
 			}
 		}
 	}
-
 	return keycloakToken, token, err
 }
 
@@ -96,7 +96,12 @@ func isAdmin(token KeycloakToken, cfg Config) bool {
 	return ContainsIgnoreCase(token.Groups, cfg.Admin.Group) && cfg.Admin.Bypass
 }
 
-func requestWithContext(r *http.Request, keycloakToken KeycloakToken) *http.Request {
+func withKeyCloakContext(r *http.Request, keycloakToken KeycloakToken) *http.Request {
 	ctx := context.WithValue(r.Context(), KeycloakCtxToken, keycloakToken)
+	return r.WithContext(ctx)
+}
+
+func withSkipContext(r *http.Request, skip bool) *http.Request {
+	ctx := context.WithValue(r.Context(), SkipCtx, skip)
 	return r.WithContext(ctx)
 }

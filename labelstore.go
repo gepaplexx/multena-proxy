@@ -12,47 +12,77 @@ import (
 )
 
 type Labelstore interface {
-	Connect() error
+	Connect(App) error
 	//Close() error
 	GetLabels(token KeycloakToken) map[string]bool
 }
 
-type ConfigMapHandler struct {
-	Users      map[string][]string `mapstructure:"users"`
-	Groups     map[string][]string `mapstructure:"groups"`
-	_converted map[string]map[string]bool
+func (a *App) WithLabelStore() {
+	switch a.Cfg.LabelStore.typ {
+	case "configmap":
+		a.LabelStore = &ConfigMapHandler{}
+	case "mysql":
+		a.LabelStore = &MySQLHandler{}
+	default:
+		Logger.Panic("Unknown labelstore type", zap.String("type", a.Cfg.LabelStore.typ))
+	}
+	err := a.LabelStore.Connect(*a)
+
+	if err != nil {
+		Logger.Panic("Error connecting to labelstore", zap.Error(err))
+	}
 }
 
-func (c *ConfigMapHandler) Connect() {
+type ConfigMapHandler struct {
+	Users     map[string][]string `mapstructure:"users"`
+	Groups    map[string][]string `mapstructure:"groups"`
+	converted map[string]map[string]bool
+}
+
+func (c *ConfigMapHandler) Connect(a App) error {
 	v := viper.NewWithOptions(viper.KeyDelimiter("::"))
 	v.SetConfigName("labels")
 	v.SetConfigType("yaml")
 	v.AddConfigPath("/etc/config/labels/")
 	v.AddConfigPath("./configs")
-	err := v.Unmarshal(c)
+	err := v.MergeInConfig()
+	if err != nil {
+		return err
+	}
+	err = v.Unmarshal(c)
 	if err != nil {
 		Logger.Panic("Error while unmarshalling config file", zap.Error(err))
+		return err
 	}
 	v.OnConfigChange(func(e fsnotify.Event) {
 		Logger.Info("Config file changed", zap.String("file", e.Name))
-		err := v.Unmarshal(c)
+		err = v.MergeInConfig()
+		if err != nil {
+			Logger.Panic("Error while unmarshalling config file", zap.Error(err))
+		}
+		err = v.Unmarshal(c)
 		if err != nil {
 			Logger.Panic("Error while unmarshalling config file", zap.Error(err))
 		}
 
 	})
 	v.WatchConfig()
+	c.convert()
+	return nil
+}
 
-	c._converted = make(map[string]map[string]bool, len(c.Users)+len(c.Groups))
+func (c *ConfigMapHandler) convert() {
+	c.converted = make(map[string]map[string]bool, len(c.Users)+len(c.Groups))
 	for username, namespaces := range c.Users {
-		c._converted[username] = make(map[string]bool, len(namespaces))
+		c.converted[username] = make(map[string]bool, len(namespaces))
 		for _, namespace := range namespaces {
-			c._converted[username][namespace] = true
+			c.converted[username][namespace] = true
 		}
 	}
 	for group, namespaces := range c.Groups {
+		c.converted[group] = make(map[string]bool, len(namespaces))
 		for _, namespace := range namespaces {
-			c._converted[group][namespace] = true
+			c.converted[group][namespace] = true
 		}
 	}
 }
@@ -60,12 +90,12 @@ func (c *ConfigMapHandler) Connect() {
 func (c *ConfigMapHandler) GetLabels(token KeycloakToken) map[string]bool {
 	username := token.PreferredUsername
 	groups := token.Groups
-	var mergedNamespaces map[string]bool
-	for k, _ := range c._converted[username] {
+	mergedNamespaces := make(map[string]bool, len(c.converted[username])*2)
+	for k, _ := range c.converted[username] {
 		mergedNamespaces[k] = true
 	}
 	for _, group := range groups {
-		for k, _ := range c._converted[group] {
+		for k, _ := range c.converted[group] {
 			mergedNamespaces[k] = true
 		}
 	}
@@ -78,24 +108,25 @@ type MySQLHandler struct {
 	TokenKey string
 }
 
-func (m *MySQLHandler) Connect() {
-	password, err := os.ReadFile(Cfg.Db.PasswordPath)
+func (m *MySQLHandler) Connect(a App) error {
+	password, err := os.ReadFile(a.Cfg.Db.PasswordPath)
 	if err != nil {
 		Logger.Panic("Could not read db password", zap.Error(err))
 	}
 	cfg := mysql.Config{
-		User:                 Cfg.Db.User,
+		User:                 a.Cfg.Db.User,
 		Passwd:               string(password),
 		Net:                  "tcp",
 		AllowNativePasswords: true,
-		Addr:                 fmt.Sprintf("%s:%d", Cfg.Db.Host, Cfg.Db.Port),
-		DBName:               Cfg.Db.DbName,
+		Addr:                 fmt.Sprintf("%s:%d", a.Cfg.Db.Host, a.Cfg.Db.Port),
+		DBName:               a.Cfg.Db.DbName,
 	}
 	// Get a database handle.
 	m.DB, err = sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		Logger.Panic("Error opening DB connection", zap.Error(err))
 	}
+	return nil
 }
 
 func (m *MySQLHandler) Close() {

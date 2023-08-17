@@ -2,18 +2,14 @@ package main
 
 import (
 	"fmt"
-	"strings"
-	"time"
-
 	logqlv2 "github.com/observatorium/api/logql/v2"
 	"github.com/prometheus/prometheus/model/labels"
-	"go.uber.org/zap"
+	"strings"
 )
 
 type LogQLEnforcer Request
 
-func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool) (string, error) {
-	currentTime := time.Now()
+func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool, labelMatch string) (string, error) {
 	if query == "" {
 		query = "{__name__=~\".+\"}"
 	}
@@ -22,14 +18,13 @@ func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool) (st
 	if err != nil {
 		return "", err
 	}
-	Logger.Info("long term query collection", zap.String("ltqc", expr.String()), zap.Time("time", currentTime))
 
 	errMsg := error(nil)
 
 	expr.Walk(func(expr interface{}) {
 		switch labelExpression := expr.(type) {
 		case *logqlv2.StreamMatcherExpr:
-			matchers, err := matchNamespaceMatchers(labelExpression.Matchers(), tenantLabels)
+			matchers, err := matchNamespaceMatchers(labelExpression.Matchers(), tenantLabels, labelMatch)
 			if err != nil {
 				errMsg = err
 				return
@@ -40,11 +35,8 @@ func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool) (st
 		}
 	})
 	if errMsg != nil {
-		Logger.Error("error", zap.Error(errMsg), zap.Int("line", 164))
 		return "", errMsg
 	}
-	Logger.Debug("expr", zap.String("expr", expr.String()), zap.Any("tl", tenantLabels))
-	Logger.Info("long term query collection processed", zap.String("ltqcp", expr.String()), zap.Any("tl", tenantLabels), zap.Time("time", currentTime))
 	return expr.String(), nil
 }
 
@@ -54,10 +46,10 @@ func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool) (st
 // label does not exist in the matchers, it adds it to the matchers along with all values from the
 // tenant labels map. If it encounters an unauthorized namespace during the process, it returns an
 // error. If everything goes well, it returns the updated matchers slice and nil error.
-func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[string]bool) ([]*labels.Matcher, error) {
+func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[string]bool, labelMatch string) ([]*labels.Matcher, error) {
 	foundNamespace := false
 	for _, match := range queryMatches {
-		if match.Name == Cfg.Loki.TenantLabel {
+		if match.Name == labelMatch {
 			foundNamespace = true
 			queryLabels := strings.Split(match.Value, "|")
 			for _, queryLabel := range queryLabels {
@@ -76,7 +68,7 @@ func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[str
 
 		queryMatches = append(queryMatches, &labels.Matcher{
 			Type:  matchType,
-			Name:  Cfg.Loki.TenantLabel,
+			Name:  labelMatch,
 			Value: strings.Join(MapKeysToArray(tenantLabels), "|"),
 		})
 	}

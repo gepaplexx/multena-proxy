@@ -11,7 +11,7 @@ import (
 )
 
 type Enforcer interface {
-	EnforceQL(string, map[string]bool) (string, error)
+	EnforceQL(string, map[string]bool, string) (string, error)
 }
 
 type Request struct {
@@ -21,19 +21,27 @@ type Request struct {
 	Enforcer
 }
 
-func (r *Request) enforce(p Provider) error {
-	token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
-	if isAdmin(token) {
+func (r *Request) enforce(ls Labelstore, labelMatch string) error {
+	if r.Context().Value(SkipCtx).(bool) {
 		return nil
 	}
-	tenantLabels := p.GetLabels(token)
-	query, err := r.EnforceQL(r.Request.URL.Query().Get(r.queryMatch), tenantLabels)
+
+	token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
+	Logger.Info("Got token", zap.Any("token", token))
+	tenantLabels := ls.GetLabels(token)
+	if len(tenantLabels) < 1 {
+		logAndWriteError(r.ResponseWriter, http.StatusForbidden, nil, "No tenant labels found")
+		return fmt.Errorf("no tenant labels found")
+	}
+	query, err := r.EnforceQL(r.Request.URL.Query().Get(r.queryMatch), tenantLabels, labelMatch)
 	if err != nil {
+		logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
 		return err
 	}
 	if r.Method == http.MethodPost {
-		err := r.enforcePost(query)
+		err = r.enforcePost(query)
 		if err != nil {
+			logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
 			return err
 		}
 	}
@@ -60,10 +68,10 @@ func (r *Request) enforcePost(query string) error {
 	return nil
 }
 
-func (r *Request) callUpstream(upstream *url.URL, useMutualTLS bool) {
+func (r *Request) callUpstream(upstream *url.URL, useMutualTLS bool, sa string) {
 	Logger.Debug("Doing request")
 	if useMutualTLS {
-		r.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", ServiceAccountToken))
+		r.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sa))
 		Logger.Debug("Set Authorization header")
 	}
 

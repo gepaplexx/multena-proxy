@@ -12,6 +12,7 @@ web:
   trusted_root_ca_path: "./certs/"
   jwks_cert_url: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
   service_account_token: "fake"
+  keycloak_token_group_name: "groups"
 
 admin:
   bypass: true

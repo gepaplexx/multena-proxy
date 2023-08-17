@@ -37,9 +37,11 @@ func TestLogqlEnforcer(t *testing.T) {
 		},
 	}
 
+	enforcer := LogQLEnforcer{}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := LogQLEnforcer{}.EnforceQL(tt.query, tt.tenantLabels)
+			result, err := enforcer.EnforceQL(tt.query, tt.tenantLabels, "kubernetes_namespace_name")
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -85,7 +87,7 @@ func TestMatchNamespaceMatchers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := matchNamespaceMatchers(tt.matchers, tt.tenantLabels)
+			_, err := matchNamespaceMatchers(tt.matchers, tt.tenantLabels, "kubernetes_namespace_name")
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {

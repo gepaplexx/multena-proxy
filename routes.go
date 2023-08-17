@@ -22,6 +22,7 @@ type contextKey string
 // KeycloakCtxToken are the context keys used in the application.
 const (
 	KeycloakCtxToken contextKey = "keycloakToken"
+	SkipCtx          contextKey = "skip"
 )
 
 func (a *App) NewRoutes() (*mux.Router, *mux.Router, error) {
@@ -60,32 +61,26 @@ func (a *App) NewRoutes() (*mux.Router, *mux.Router, error) {
 	thanosRouter := e.PathPrefix("").Subrouter()
 
 	e.Use(a.loggingMiddleware)
-	e.Use(authMiddleware)
+	e.Use(a.authMiddleware)
 
 	for _, route := range routes {
 
 		lokiRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
 			req := Request{route.MatchWord, w, r, LogQLEnforcer{}}
-			err := req.enforce(ConfigMapProvider{
-				Users:  nil,
-				Groups: nil,
-			})
+			err := req.enforce(a.LabelStore, a.Cfg.Loki.TenantLabel)
 			if err != nil {
 				return
 			}
-			req.callUpstream(thanosUrl, Cfg.Thanos.UseMutualTLS)
+			req.callUpstream(thanosUrl, a.Cfg.Thanos.UseMutualTLS, a.ServiceAccountToken)
 		})
 
 		thanosRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
 			req := Request{route.MatchWord, w, r, PromQLRequest{}}
-			err := req.enforce(ConfigMapProvider{
-				Users:  nil,
-				Groups: nil,
-			})
+			err := req.enforce(a.LabelStore, a.Cfg.Thanos.TenantLabel)
 			if err != nil {
 				return
 			}
-			req.callUpstream(lokiUrl, Cfg.Loki.UseMutualTLS)
+			req.callUpstream(lokiUrl, a.Cfg.Loki.UseMutualTLS, a.Cfg.Web.ServiceAccountToken)
 		})
 	}
 
@@ -93,8 +88,6 @@ func (a *App) NewRoutes() (*mux.Router, *mux.Router, error) {
 	return e, i, nil
 }
 
-// HealthCheckHandler is a HTTP handler function that always responds with
-// HTTP status code 200 and body "Ok". It is typically used for health check endpoints.
 func HealthCheckHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("Ok"))

@@ -16,7 +16,7 @@ import (
 var Logger *zap.Logger
 var Level zap.AtomicLevel
 
-func NewLogger() {
+func init() {
 	Level = zap.NewAtomicLevel()
 	Level.SetLevel(getZapLevel("info"))
 
@@ -83,7 +83,7 @@ func (a *App) loggingMiddleware(next http.Handler) http.Handler {
 			bodyBytes = []byte("[REDACTED]")
 		}
 
-		logRequestData(r, bodyBytes)
+		logRequestData(r, bodyBytes, a.Cfg.Log.LogTokens)
 		next.ServeHTTP(w, r)
 		Logger.Debug("Request", zap.String("complete", "true"))
 	})
@@ -105,9 +105,9 @@ func readBody(r *http.Request) []byte {
 }
 
 // logRequestData function takes note of what is in the request, like noting down the details of the letter that came in the mail.
-func logRequestData(r *http.Request, bodyBytes []byte) {
+func logRequestData(r *http.Request, bodyBytes []byte, logToken bool) {
 	rd := requestData{r.Method, r.URL.String(), r.Header, string(bodyBytes)}
-	if !Cfg.Log.LogTokens {
+	if logToken {
 		rd.Header = cleanSensitiveHeaders(rd.Header)
 	}
 	jsonData, err := json.Marshal(rd)
@@ -135,7 +135,7 @@ func logAndWriteError(rw http.ResponseWriter, statusCode int, err error, message
 	if message == "" {
 		message = err.Error()
 	}
-	Logger.Error(message, zap.Error(err))
+	Logger.Debug(message, zap.Error(err))
 	rw.WriteHeader(statusCode)
 	_, _ = fmt.Fprint(rw, message+"\n")
 }
