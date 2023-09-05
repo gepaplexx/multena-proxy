@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.20'
+          go-version: '1.21'
           cache: true
       - uses: actions/checkout@v3
       - name: golangci-lint
@@ -70,7 +70,10 @@ jobs:
         run: go get .
 
       - name: Build
-        run: go build -ldflags="-X main.Commit=$(git rev-parse HEAD)" -o . -v ./...
+        run: CGO_ENABLED=0 GOOS=linux go build -ldflags="-X main.Commit=$(git rev-parse HEAD)" -o . -v ./...
+
+      - name: Change permissions
+        run: chgrp -R 0 multena-proxy && chmod -R g=u multena-proxy
 
       - name: Copy build
         run: mkdir ./.cache && cp ./multena-proxy ./.cache/multena-proxy
@@ -79,7 +82,7 @@ jobs:
         run: go test -v ./...
 
   push:
-    needs: [ build-and-test, scan-code, golangci ]
+    needs: [ build-and-test, scan-code, lint ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -95,36 +98,30 @@ jobs:
       - name: Set image name
         run: echo "IMAGE_ID=$(echo ${{ github.repository }} | tr '[A-Z]' '[a-z]')" >> $GITHUB_ENV
 
-      - name: Autotag
-        uses: phish108/autotag-action@v1.1.64
-        id: autotag
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
-
-      - name: Create a new release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ steps.autotag.outputs.new-tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+      - name: Get tag version
+        id: tag_version
+        uses: anothrNick/github-tag-action@1.67.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          DRY_RUN: true
+          DEFAULT_BUMP: patch
+          VERBOSE: true
 
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v4
         with:
-          # list of Docker images to use as base name for tags
           images: |
             ghcr.io/${{ env.IMAGE_ID }}
-          # generate Docker tags based on the following events/attributes
           tags: |
             type=schedule
             type=ref,event=branch
-            type=semver,pattern={{version}},value=${{ steps.autotag.outputs.new-tag }}
-            type=sha
-          flavor: |
-            latest=true
+            type=raw,value=${{ github.head_ref }}-${{ steps.tag_version.outputs.new_tag }}, enable=${{ github.head_ref != github.event.repository.default_branch }}
+            type=raw,value=${{ github.head_ref }}-${{ steps.tag_version.outputs.new_tag }}-${{github.sha}}, enable=${{ github.head_ref != github.event.repository.default_branch }}
+            type=raw,value=${{github.sha}}
+            type=semver,pattern={{version}},value=${{ steps.tag_version.outputs.new_tag }},enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Buildah Action
         id: build-image
@@ -149,7 +146,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          input: './multena-proxy-oci'
+          input: 'multena-proxy-oci'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH, MEDIUM, LOW'
@@ -165,10 +162,19 @@ jobs:
         run: echo ${{ steps.docker_build.outputs.digest }}
 
       - name: Push to GitHub Container Repository
-        if: github.event_name != 'pull_request'
         id: push-to-ghcr
         uses: redhat-actions/push-to-registry@v2
         with:
           image: ${{ steps.build-image.outputs.image }}
           tags: ${{ steps.build-image.outputs.tags }}
           registry: ${{ env.REGISTRY }}
+
+
+      - name: Get tag version
+        if: ${{ github.event_name != 'pull_request' }}
+        id: tag_version_final
+        uses: anothrNick/github-tag-action@1.67.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          DEFAULT_BUMP: patch

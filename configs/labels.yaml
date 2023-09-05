@@ -1,4 +1,4 @@
-groups:
-  - example_group: ["example_namespace"]
-users:
-  - example_user: [ "example_namespace" ]
+group1:
+  '#cluster-wide': true
+user1:
+  hogarama: true

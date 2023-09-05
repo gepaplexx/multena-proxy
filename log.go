@@ -6,67 +6,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"runtime"
 	"strings"
 
-	"go.uber.org/zap/zapcore"
-
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-var (
-	Logger *zap.Logger
-	Level  zap.AtomicLevel
-)
-
-func init() {
-	Level = zap.NewAtomicLevel()
-	Level.SetLevel(getZapLevel("info"))
-
-	rawJSON := []byte(`{
-		"level": "info",
-		"encoding": "json",
-		"outputPaths": ["stdout"],
-		"errorOutputPaths": ["stdout"],
-		"encoderConfig": {
-		  "messageKey": "msg",
-		  "levelKey": "level",
-		  "levelEncoder": "lowercase"
-		}
-	  }`)
-
-	var cfg zap.Config
-	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
-		panic(err)
+func (a *App) UpdateLogLevel() *App {
+	levels := map[string]int{
+		"debug": 0,
+		"info":  1,
+		"warn":  2,
+		"error": 3,
+		"fatal": 4,
 	}
-	Logger = zap.Must(cfg.Build())
-
-	Logger.Debug("log construction succeeded")
-	Logger.Debug("Go Version", zap.String("version", runtime.Version()))
-	Logger.Debug("Go OS/Arch", zap.String("os", runtime.GOOS), zap.String("arch", runtime.GOARCH))
-	Logger.Debug("Config", zap.Any("cfg", cfg))
-}
-
-// getZapLevel translates a string representation of a logging level into a zapcore.Level.
-func getZapLevel(level string) zapcore.Level {
-	switch level {
-	case "debug":
-		return zapcore.DebugLevel
-	case "info":
-		return zapcore.InfoLevel
-	case "warn":
-		return zapcore.WarnLevel
-	case "error":
-		return zapcore.ErrorLevel
-	case "fatal":
-		return zapcore.FatalLevel
-	default: // unknown level or not set, default to info
-		return zapcore.InfoLevel
-	}
-}
-
-func (a *App) UpdateLogLevel() {
-	Level.SetLevel(getZapLevel(strings.ToLower(a.Cfg.Log.Level)))
+	zerolog.SetGlobalLevel(zerolog.Level(levels[strings.ToLower(a.Cfg.Log.Level)]))
+	return a
 }
 
 // requestData structure contains information about a HTTP request.
@@ -88,7 +43,7 @@ func (a *App) loggingMiddleware(next http.Handler) http.Handler {
 
 		logRequestData(r, bodyBytes, a.Cfg.Log.LogTokens)
 		next.ServeHTTP(w, r)
-		Logger.Debug("Request", zap.String("complete", "true"))
+		log.Debug().Str("path", r.URL.Path).Msg("Request complete")
 	})
 }
 
@@ -99,7 +54,7 @@ func readBody(r *http.Request) []byte {
 	if r.Body != nil {
 		bodyBytes, err = io.ReadAll(r.Body)
 		if err != nil {
-			Logger.Error("Error reading body", zap.Error(err))
+			log.Error().Err(err).Msg("")
 			return nil
 		}
 		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
@@ -115,10 +70,10 @@ func logRequestData(r *http.Request, bodyBytes []byte, logToken bool) {
 	}
 	jsonData, err := json.Marshal(rd)
 	if err != nil {
-		Logger.Error("Error while marshalling request", zap.Error(err))
+		log.Error().Err(err).Msg("Error while marshalling request")
 		return
 	}
-	Logger.Debug("Request", zap.String("request", string(jsonData)), zap.String("path", r.URL.Path))
+	log.Debug().Str("request", string(jsonData)).Str("path", r.URL.Path).Msg("")
 }
 
 // cleanSensitiveHeaders function is like removing personal details from the letter before it's recorded or read by someone else.
@@ -138,7 +93,12 @@ func logAndWriteError(rw http.ResponseWriter, statusCode int, err error, message
 	if message == "" {
 		message = err.Error()
 	}
-	Logger.Debug(message, zap.Error(err))
+	log.Debug().Err(err).Msg(message)
 	rw.WriteHeader(statusCode)
 	_, _ = fmt.Fprint(rw, message+"\n")
+}
+
+func (a *App) logConfig() *App {
+	log.Debug().Any("config", a.Cfg).Msg("")
+	return a
 }

@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"go.uber.org/zap"
+	"github.com/rs/zerolog/log"
 )
 
 type Enforcer interface {
@@ -23,13 +23,12 @@ type Request struct {
 }
 
 func (r *Request) enforce(ls Labelstore, labelMatch string) error {
-	if r.Context().Value(SkipCtx).(bool) {
+	token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
+	tenantLabels, skip := ls.GetLabels(token)
+	if skip {
+		log.Debug().Str("user", token.PreferredUsername).Msg("Skipping label enforcement")
 		return nil
 	}
-
-	token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
-	Logger.Info("Got token", zap.Any("token", token))
-	tenantLabels := ls.GetLabels(token)
 	if len(tenantLabels) < 1 {
 		logAndWriteError(r.ResponseWriter, http.StatusForbidden, nil, "No tenant labels found")
 		return fmt.Errorf("no tenant labels found")
@@ -60,7 +59,7 @@ func (r *Request) enforcePost(query string) error {
 	if err := r.ParseForm(); err != nil {
 		return err
 	}
-	Logger.Debug("Parsed form", zap.Any("form", r.PostForm))
+	log.Debug().Interface("form", r.PostForm).Msg("Parsed form")
 	_ = r.Body.Close()
 	r.PostForm.Set(r.queryMatch, query)
 	newBody := r.PostForm.Encode()
@@ -70,10 +69,10 @@ func (r *Request) enforcePost(query string) error {
 }
 
 func (r *Request) callUpstream(upstream *url.URL, useMutualTLS bool, sa string) {
-	Logger.Debug("Doing request")
+	log.Debug().Msg("Doing request")
 	if useMutualTLS {
 		r.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sa))
-		Logger.Debug("Set Authorization header")
+		log.Debug().Msg("Set Authorization header")
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(upstream)

@@ -7,8 +7,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/pkgerrors"
 
 	"github.com/MicahParks/keyfunc/v2"
 	"github.com/fsnotify/fsnotify"
@@ -17,7 +23,6 @@ import (
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 	"github.com/slok/go-http-metrics/middleware/std"
-	"go.uber.org/zap"
 )
 
 var Commit string
@@ -28,6 +33,9 @@ type App struct {
 	Tls                 *tls.Config
 	ServiceAccountToken string
 	LabelStore          Labelstore
+	i                   *mux.Router
+	e                   *mux.Router
+	healthy             bool
 }
 
 type Config struct {
@@ -36,16 +44,13 @@ type Config struct {
 		LogTokens bool   `mapstructure:"log_tokens"`
 	} `mapstructure:"log"`
 
-	LabelStore struct {
-		typ string `mapstructure:"type"`
-	} `mapstructure:"labelstore"`
-
 	Web struct {
 		ProxyPort              int    `mapstructure:"proxy_port"`
 		MetricsPort            int    `mapstructure:"metrics_port"`
 		Host                   string `mapstructure:"host"`
 		InsecureSkipVerify     bool   `mapstructure:"insecure_skip_verify"`
 		TrustedRootCaPath      string `mapstructure:"trusted_root_ca_path"`
+		LabelStoreKind         string `mapstructure:"label_store_kind"`
 		JwksCertURL            string `mapstructure:"jwks_cert_url"`
 		KeycloakTokenGroupName string `mapstructure:"keycloak_token_group_name"`
 		ServiceAccountToken    string `mapstructure:"service_account_token"`
@@ -89,51 +94,29 @@ type Config struct {
 }
 
 func main() {
-	defer func(Logger *zap.Logger) {
-		err := Logger.Sync()
-		if err != nil {
-			fmt.Printf("{\"level\":\"error\",\"error\":\"%s/\"}", err)
-			return
-		}
-	}(Logger)
-
-	Logger.Info("-------Init Proxy-------")
-	Logger.Info("Commit: ", zap.String("commit", Commit))
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+	log.Info().Msg("-------Init Proxy-------")
+	log.Info().Msgf("Commit: %s", Commit)
+	log.Debug().Str("go_version", runtime.Version()).Msg("")
+	log.Debug().Str("go_os", runtime.GOOS).Str("go_arch", runtime.GOARCH).Msg("")
+	log.Debug().Str("go_compiler", runtime.Compiler).Msg("")
 
 	app := App{}
-	app.WithConfig()
-	Logger.Info("Config ", zap.Any("cfg", app.Cfg))
-	app.UpdateLogLevel()
-	app.NewTLSConfig()
-	app.WithJWKS()
-	e, i, err := app.NewRoutes()
+	app.WithConfig().
+		logConfig().
+		WithTLSConfig().
+		WithJWKS().
+		WithLabelStore().
+		WithRoutes().
+		StartServer()
 
-	Logger.Info("Config ", zap.Any("cfg", app.Cfg))
-	Logger.Info("------Init Complete------")
-
-	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", app.Cfg.Web.Host, app.Cfg.Web.MetricsPort), i); err != nil {
-			Logger.Panic("Error while serving metrics", zap.Error(err))
-		}
-	}()
-
-	if err != nil {
-		Logger.Panic("Error while initializing application", zap.Error(err))
-	}
-
-	mdlw := middleware.New(middleware.Config{
-		Recorder: metrics.NewRecorder(metrics.Config{}),
-		Service:  "multena",
-	})
-	err = http.ListenAndServe(fmt.Sprintf("%s:%d", app.Cfg.Web.Host, app.Cfg.Web.ProxyPort),
-		std.Handler("/", mdlw, e))
-
-	if err != nil {
-		Logger.Panic("Error while serving", zap.Error(err))
-	}
+	log.Info().Any("config", app.Cfg)
+	log.Info().Msg("------Init Complete------")
+	select {}
 }
 
-func (a *App) WithConfig() {
+func (a *App) WithConfig() *App {
 	v := viper.NewWithOptions(viper.KeyDelimiter("::"))
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
@@ -141,35 +124,41 @@ func (a *App) WithConfig() {
 	v.AddConfigPath("./configs")
 	err := v.MergeInConfig()
 	if err != nil {
-		return
+		return nil
 	}
 	a.Cfg = &Config{}
 	err = v.Unmarshal(a.Cfg)
 	if err != nil {
-		Logger.Panic("Error while unmarshalling config file", zap.Error(err))
+		log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 	}
 	v.OnConfigChange(func(e fsnotify.Event) {
-		Logger.Info("Config file changed", zap.String("file", e.Name))
+		a.UpdateLogLevel()
+		log.Info().Str("file", e.Name).Msg("Config file changed")
 		err := v.Unmarshal(a.Cfg)
 		if err != nil {
-			Logger.Panic("Error while unmarshalling config file", zap.Error(err))
+			log.Error().Err(err).Msg("Error while unmarshalling config file")
+			a.healthy = false
 		}
 	})
-	if err != nil { // Handle errors reading the config file
-		Logger.Panic("Error while unmarshalling config file", zap.Error(err))
-	}
 	v.WatchConfig()
+	a.UpdateLogLevel()
+	return a
 }
 
-func (a *App) ReadServerAccountToken() {
+func (a *App) WithSAT() *App {
+	if a.Cfg.Dev.Enabled {
+		a.ServiceAccountToken = a.Cfg.Web.ServiceAccountToken
+		return a
+	}
 	sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
 	if err != nil {
-		Logger.Panic("Error while reading service account token", zap.Error(err))
+		log.Fatal().Err(err).Msg("Error while reading service account token")
 	}
 	a.Cfg.Web.ServiceAccountToken = string(sa)
+	return a
 }
 
-func (a *App) NewTLSConfig() {
+func (a *App) WithTLSConfig() *App {
 	rootCAs, _ := x509.SystemCertPool()
 	if rootCAs == nil {
 		rootCAs = x509.NewCertPool()
@@ -186,35 +175,35 @@ func (a *App) NewTLSConfig() {
 
 			certs, err := os.ReadFile(path)
 			if err != nil {
-				Logger.Error("Error while reading trusted CA", zap.Error(err))
+				log.Error().Err(err).Msg("Error while reading trusted CA")
 				return err
 			}
-			Logger.Debug("Adding trusted CA", zap.String("path", path))
+			log.Debug().Str("path", path).Msg("Adding trusted CA")
 			certs = append(certs, []byte("\n")...)
 			rootCAs.AppendCertsFromPEM(certs)
 
 			return nil
 		})
 		if err != nil {
-			Logger.Error("Error while traversing directory", zap.Error(err))
+			log.Error().Err(err).Msg("Error while traversing directory")
 		}
 	}
 
 	var certificates []tls.Certificate
 
 	lokiCert, err := tls.LoadX509KeyPair(a.Cfg.Loki.Cert, a.Cfg.Loki.Key)
-	if err != nil {
-		Logger.Error("Error while loading loki certificate", zap.Error(err))
+	if err == nil {
+		log.Error().Err(err).Msg("Error while loading loki certificate")
 	} else {
-		Logger.Debug("Adding Loki certificate", zap.String("path", a.Cfg.Loki.Cert))
+		log.Debug().Str("path", a.Cfg.Loki.Cert).Msg("Adding Loki certificate")
 		certificates = append(certificates, lokiCert)
 	}
 
 	thanosCert, err := tls.LoadX509KeyPair(a.Cfg.Thanos.Cert, a.Cfg.Thanos.Key)
-	if err != nil {
-		Logger.Error("Error while loading thanos certificate", zap.Error(err))
+	if err == nil {
+		log.Error().Err(err).Msg("Error while loading thanos certificate")
 	} else {
-		Logger.Debug("Adding Thanos certificate", zap.String("path", a.Cfg.Loki.Cert))
+		log.Debug().Str("path", a.Cfg.Thanos.Cert).Msg("Adding Thanos certificate")
 		certificates = append(certificates, thanosCert)
 	}
 
@@ -225,17 +214,18 @@ func (a *App) NewTLSConfig() {
 	}
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = config
+	return a
 }
 
-func (a *App) WithJWKS() {
-	Logger.Info("Init Keycloak config")
+func (a *App) WithJWKS() *App {
+	log.Info().Msg("Init Keycloak config")
 	jwksURL := a.Cfg.Web.JwksCertURL
-	Logger.Info("JWKS URL", zap.String("url", jwksURL))
+	log.Info().Str("url", jwksURL).Msg("JWKS URL")
 
 	options := keyfunc.Options{
 		RefreshErrorHandler: func(err error) {
 			if err != nil {
-				Logger.Error("Error serving Keyfunc", zap.Error(err))
+				log.Error().Err(err).Msg("Error refreshing Keyfunc")
 			}
 		},
 		RefreshInterval:   time.Hour,
@@ -246,8 +236,28 @@ func (a *App) WithJWKS() {
 
 	jwks, err := keyfunc.Get(jwksURL, options)
 	if err != nil {
-		Logger.Panic("Error init jwks", zap.Error(err))
+		log.Fatal().Err(err).Msg("Error init jwks")
 	}
-	Logger.Info("Finished Keycloak config")
+	log.Info().Msg("Finished Keycloak config")
 	a.Jwks = jwks
+	return a
+}
+
+func (a *App) StartServer() {
+	go func() {
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", a.Cfg.Web.Host, a.Cfg.Web.MetricsPort), a.i); err != nil {
+			log.Fatal().Err(err).Msg("Error while serving metrics")
+		}
+	}()
+
+	go func() {
+		mdlw := middleware.New(middleware.Config{
+			Recorder: metrics.NewRecorder(metrics.Config{}),
+			Service:  "multena",
+		})
+
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", a.Cfg.Web.Host, a.Cfg.Web.ProxyPort), std.Handler("/", mdlw, a.e)); err != nil {
+			log.Fatal().Err(err).Msg("Error while serving proxy")
+		}
+	}()
 }

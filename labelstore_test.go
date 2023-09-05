@@ -8,22 +8,21 @@ import (
 
 func TestGetLabelsCM(t *testing.T) {
 	cmh := ConfigMapHandler{
-		Users: map[string][]string{
-			"user1": {"u1", "u2"},
-			"user2": {"u3", "u4"},
-		},
-		Groups: map[string][]string{
-			"group1": {"g1", "g2"},
-			"group2": {"g3", "g4"},
+		labels: map[string]map[string]bool{
+			"user1":      {"u1": true, "u2": true},
+			"user2":      {"u3": true, "u4": true},
+			"group1":     {"g1": true, "g2": true},
+			"group2":     {"g3": true, "g4": true},
+			"adminGroup": {"#cluster-wide": true, "g4": true},
 		},
 	}
-	cmh.convert()
 
 	cases := []struct {
 		name     string
 		username string
 		groups   []string
 		expected map[string]bool
+		skip     bool
 	}{
 		{
 			name:     "User with groups",
@@ -65,12 +64,20 @@ func TestGetLabelsCM(t *testing.T) {
 				"u2": true,
 			},
 		},
+		{
+			name:     "admin_group",
+			username: "blubb",
+			groups:   []string{"adminGroup"},
+			expected: nil,
+			skip:     true,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			labels := cmh.GetLabels(KeycloakToken{PreferredUsername: tc.username, Groups: tc.groups})
+			labels, skip := cmh.GetLabels(KeycloakToken{PreferredUsername: tc.username, Groups: tc.groups})
 			assert.Equal(t, tc.expected, labels)
+			assert.Equal(t, tc.skip, skip)
 		})
 	}
 }

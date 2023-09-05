@@ -6,40 +6,40 @@ import (
 	"os"
 	"strings"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 type Labelstore interface {
 	Connect(App) error
-	// Close() error
-	GetLabels(token KeycloakToken) map[string]bool
+	GetLabels(token KeycloakToken) (map[string]bool, bool)
 }
 
-func (a *App) WithLabelStore() {
-	switch a.Cfg.LabelStore.typ {
+func (a *App) WithLabelStore() *App {
+	log.Debug().Str("type", a.Cfg.Web.LabelStoreKind).Msg("Using label store")
+	switch a.Cfg.Web.LabelStoreKind {
 	case "configmap":
 		a.LabelStore = &ConfigMapHandler{}
 	case "mysql":
 		a.LabelStore = &MySQLHandler{}
 	default:
-		Logger.Panic("Unknown labelstore type", zap.String("type", a.Cfg.LabelStore.typ))
+		log.Fatal().Str("type", a.Cfg.Web.LabelStoreKind).Msg("Unknown label store type")
 	}
 	err := a.LabelStore.Connect(*a)
 	if err != nil {
-		Logger.Panic("Error connecting to labelstore", zap.Error(err))
+		log.Fatal().Err(err).Msg("Error connecting to labelstore")
 	}
+	return a
 }
 
 type ConfigMapHandler struct {
-	Users     map[string][]string `mapstructure:"users"`
-	Groups    map[string][]string `mapstructure:"groups"`
-	converted map[string]map[string]bool
+	labels map[string]map[string]bool
 }
 
-func (c *ConfigMapHandler) Connect(a App) error {
+func (c *ConfigMapHandler) Connect(_ App) error {
 	v := viper.NewWithOptions(viper.KeyDelimiter("::"))
 	v.SetConfigName("labels")
 	v.SetConfigType("yaml")
@@ -49,56 +49,45 @@ func (c *ConfigMapHandler) Connect(a App) error {
 	if err != nil {
 		return err
 	}
-	err = v.Unmarshal(c)
+	err = v.Unmarshal(&c.labels)
 	if err != nil {
-		Logger.Panic("Error while unmarshalling config file", zap.Error(err))
+		log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 		return err
 	}
 	v.OnConfigChange(func(e fsnotify.Event) {
-		Logger.Info("Config file changed", zap.String("file", e.Name))
+		log.Info().Str("file", e.Name).Msg("Config file changed")
 		err = v.MergeInConfig()
 		if err != nil {
-			Logger.Panic("Error while unmarshalling config file", zap.Error(err))
+			log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 		}
-		err = v.Unmarshal(c)
+		err = v.Unmarshal(&c.labels)
 		if err != nil {
-			Logger.Panic("Error while unmarshalling config file", zap.Error(err))
+			log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 		}
 	})
 	v.WatchConfig()
-	c.convert()
 	return nil
 }
 
-func (c *ConfigMapHandler) convert() {
-	c.converted = make(map[string]map[string]bool, len(c.Users)+len(c.Groups))
-	for username, namespaces := range c.Users {
-		c.converted[username] = make(map[string]bool, len(namespaces))
-		for _, namespace := range namespaces {
-			c.converted[username][namespace] = true
-		}
-	}
-	for group, namespaces := range c.Groups {
-		c.converted[group] = make(map[string]bool, len(namespaces))
-		for _, namespace := range namespaces {
-			c.converted[group][namespace] = true
-		}
-	}
-}
-
-func (c *ConfigMapHandler) GetLabels(token KeycloakToken) map[string]bool {
+func (c *ConfigMapHandler) GetLabels(token KeycloakToken) (map[string]bool, bool) {
 	username := token.PreferredUsername
 	groups := token.Groups
-	mergedNamespaces := make(map[string]bool, len(c.converted[username])*2)
-	for k := range c.converted[username] {
+	mergedNamespaces := make(map[string]bool, len(c.labels[username])*2)
+	for k := range c.labels[username] {
 		mergedNamespaces[k] = true
-	}
-	for _, group := range groups {
-		for k := range c.converted[group] {
-			mergedNamespaces[k] = true
+		if k == "#cluster-wide" {
+			return nil, true
 		}
 	}
-	return mergedNamespaces
+	for _, group := range groups {
+		for k := range c.labels[group] {
+			mergedNamespaces[k] = true
+			if k == "#cluster-wide" {
+				return nil, true
+			}
+		}
+	}
+	return mergedNamespaces, false
 }
 
 type MySQLHandler struct {
@@ -110,7 +99,7 @@ type MySQLHandler struct {
 func (m *MySQLHandler) Connect(a App) error {
 	password, err := os.ReadFile(a.Cfg.Db.PasswordPath)
 	if err != nil {
-		Logger.Panic("Could not read db password", zap.Error(err))
+		log.Fatal().Err(err).Msg("Could not read db password")
 	}
 	cfg := mysql.Config{
 		User:                 a.Cfg.Db.User,
@@ -123,7 +112,7 @@ func (m *MySQLHandler) Connect(a App) error {
 	// Get a database handle.
 	m.DB, err = sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
-		Logger.Panic("Error opening DB connection", zap.Error(err))
+		log.Fatal().Err(err).Msg("Error opening DB connection")
 	}
 	return nil
 }
@@ -131,11 +120,11 @@ func (m *MySQLHandler) Connect(a App) error {
 func (m *MySQLHandler) Close() {
 	err := m.DB.Close()
 	if err != nil {
-		Logger.Panic("Error closing DB connection", zap.Error(err))
+		log.Fatal().Err(err).Msg("Error closing DB connection")
 	}
 }
 
-func (m *MySQLHandler) GetLabels(token KeycloakToken) map[string]bool {
+func (m *MySQLHandler) GetLabels(token KeycloakToken) (map[string]bool, bool) {
 	tokenMap := map[string]string{
 		"email":             token.Email,
 		"preferredUsername": token.PreferredUsername,
@@ -144,8 +133,8 @@ func (m *MySQLHandler) GetLabels(token KeycloakToken) map[string]bool {
 
 	value, ok := tokenMap[m.TokenKey]
 	if !ok {
-		Logger.Panic("Unsupported token property", zap.String("property", m.TokenKey))
-		return nil
+		log.Fatal().Str("property", m.TokenKey).Msg("Unsupported token property")
+		return nil, false
 	}
 	n := strings.Count(m.Query, "?")
 
@@ -158,11 +147,11 @@ func (m *MySQLHandler) GetLabels(token KeycloakToken) map[string]bool {
 	defer func(res *sql.Rows) {
 		err := res.Close()
 		if err != nil {
-			Logger.Panic("Error closing DB result", zap.Error(err))
+			log.Fatal().Err(err).Msg("Error closing DB result")
 		}
 	}(res)
 	if err != nil {
-		Logger.Panic("Error while querying database", zap.Error(err))
+		log.Fatal().Err(err).Msg("Error while querying database")
 	}
 	labels := make(map[string]bool)
 	for res.Next() {
@@ -170,8 +159,8 @@ func (m *MySQLHandler) GetLabels(token KeycloakToken) map[string]bool {
 		err = res.Scan(&label)
 		labels[label] = true
 		if err != nil {
-			Logger.Panic("Error scanning DB result", zap.Error(err))
+			log.Fatal().Err(err).Msg("Error scanning DB result")
 		}
 	}
-	return labels
+	return labels, false
 }

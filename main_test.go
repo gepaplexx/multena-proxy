@@ -12,9 +12,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 )
 
 func genJWKS(username, email string, groups []string, pk *ecdsa.PrivateKey) (string, error) {
@@ -28,7 +29,6 @@ func genJWKS(username, email string, groups []string, pk *ecdsa.PrivateKey) (str
 }
 
 func setupTestMain() (App, map[string]string) {
-	Level.SetLevel(zap.DebugLevel)
 	// Generate a new private key.
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -142,21 +142,20 @@ func setupTestMain() (App, map[string]string) {
 	app.Cfg.Loki.TenantLabel = "tenant_id"
 
 	cmh := ConfigMapHandler{
-		Users: map[string][]string{"user": {"allowed_user", "also_allowed_user"}},
-		Groups: map[string][]string{
-			"group1": {"allowed_group1", "also_allowed_group1"},
-			"group2": {"allowed_group2", "also_allowed_group2"},
+		labels: map[string]map[string]bool{
+			"user":   {"allowed_user": true, "also_allowed_user": true},
+			"group1": {"allowed_group1": true, "also_allowed_group1": true},
+			"group2": {"allowed_group2": true, "also_allowed_group2": true},
 		},
 	}
-	cmh.convert()
 
 	app.LabelStore = &cmh
-
 	return app, tokens
 }
 
 func Test_reverseProxy(t *testing.T) {
 	app, tokens := setupTestMain()
+	log.Level(2)
 
 	cases := []struct {
 		name             string
@@ -294,10 +293,9 @@ func Test_reverseProxy(t *testing.T) {
 		},
 	}
 
-	r, _, err := app.NewRoutes()
-	if err != nil {
-		t.Fatal(err)
-	}
+	app.WithRoutes().
+		WithLoki().
+		WithThanos()
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -314,10 +312,9 @@ func Test_reverseProxy(t *testing.T) {
 			// Prepare the response recorder
 			rr := httptest.NewRecorder()
 
-			Logger.Debug("Request", zap.String("URL", tc.URL), zap.String("Authorization", tc.authorization))
-
+			log.Debug().Str("URL", tc.URL).Str("Authorization", tc.authorization).Msg("Request")
 			// Call the function
-			r.ServeHTTP(rr, req)
+			app.e.ServeHTTP(rr, req)
 
 			// Check the status code
 			assert.Equal(t, tc.expectedStatus, rr.Code)

@@ -2,14 +2,13 @@ log:
   level: DEBUG
   log_tokens: false
 
-tenant_provider: configmap
-
 web:
   proxy_port: 8080
   metrics_port: 8081
   host: localhost
   insecure_skip_verify: true
   trusted_root_ca_path: "./certs/"
+  label_store_kind: "configmap"
   jwks_cert_url: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
   service_account_token: "fake"
   keycloak_token_group_name: "groups"

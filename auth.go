@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -36,7 +35,6 @@ func (a *App) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		r = withSkipContext(r, isAdmin(keycloakToken, *a.Cfg))
 		r = withKeyCloakContext(r, keycloakToken)
 		next.ServeHTTP(w, r)
 	})
@@ -56,17 +54,9 @@ func getBearerToken(r *http.Request) (string, error) {
 
 func parseJwtToken(tokenString string, a *App) (KeycloakToken, *jwt.Token, error) {
 	var keycloakToken KeycloakToken
-
 	var claimsMap jwt.MapClaims
-	parseFunc := func(token *jwt.Token) (interface{}, error) {
-		return nil, fmt.Errorf("unable to verify token")
-	}
 
-	if !a.Cfg.Dev.Enabled {
-		parseFunc = a.Jwks.Keyfunc
-	}
-
-	token, err := jwt.ParseWithClaims(tokenString, &claimsMap, parseFunc)
+	token, err := jwt.ParseWithClaims(tokenString, &claimsMap, a.Jwks.Keyfunc)
 	if err != nil {
 		return keycloakToken, nil, err
 	}
@@ -98,10 +88,5 @@ func isAdmin(token KeycloakToken, cfg Config) bool {
 
 func withKeyCloakContext(r *http.Request, keycloakToken KeycloakToken) *http.Request {
 	ctx := context.WithValue(r.Context(), KeycloakCtxToken, keycloakToken)
-	return r.WithContext(ctx)
-}
-
-func withSkipContext(r *http.Request, skip bool) *http.Request {
-	ctx := context.WithValue(r.Context(), SkipCtx, skip)
 	return r.WithContext(ctx)
 }
