@@ -74,7 +74,7 @@ jobs:
 
       - name: Change permissions
         run: | 
-          sudo hgrp -R 0 multena-proxy
+          sudo chgrp -R 0 multena-proxy
           sudo chmod -R g=u multena-proxy
           
 
