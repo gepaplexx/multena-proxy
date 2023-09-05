@@ -12,7 +12,7 @@ on:
     - cron: '20 8 * * 4'
 
 jobs:
-  golangci:
+  lint:
     name: lint
     runs-on: ubuntu-latest
     steps:
