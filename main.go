@@ -109,6 +109,7 @@ func main() {
 		WithJWKS().
 		WithLabelStore().
 		WithRoutes().
+		WithHealthz().
 		StartServer()
 
 	log.Info().Any("config", app.Cfg)
