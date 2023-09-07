@@ -50,6 +50,7 @@ func (a *App) WithRoutes() *App {
 
 func (a *App) WithHealthz() *App {
 	i := mux.NewRouter()
+	a.healthy = true
 	i.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if a.healthy {
 			w.WriteHeader(http.StatusOK)
