@@ -120,7 +120,7 @@ func (a *App) WithConfig() *App {
 	v := viper.NewWithOptions(viper.KeyDelimiter("::"))
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
-	v.AddConfigPath("/etc/config/labels/")
+	v.AddConfigPath("/etc/config/config/")
 	v.AddConfigPath("./configs")
 	err := v.MergeInConfig()
 	if err != nil {
