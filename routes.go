@@ -62,6 +62,7 @@ func (a *App) WithHealthz() *App {
 	})
 	i.HandleFunc("/debug/pprof/", pprof.Index)
 	i.Handle("/metrics", promhttp.Handler())
+	a.i = i
 	return a
 }
 
