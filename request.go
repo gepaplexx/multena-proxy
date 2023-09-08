@@ -72,7 +72,7 @@ func (r *Request) enforcePost(query string) error {
 
 func (r *Request) callUpstream(upstream *url.URL, useMutualTLS bool, sa string) {
 	log.Debug().Msg("Doing request")
-	if useMutualTLS {
+	if !useMutualTLS {
 		r.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sa))
 		log.Debug().Msg("Set Authorization header")
 	}
