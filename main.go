@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
@@ -26,72 +25,6 @@ import (
 )
 
 var Commit string
-
-type App struct {
-	Jwks                *keyfunc.JWKS
-	Cfg                 *Config
-	Tls                 *tls.Config
-	ServiceAccountToken string
-	LabelStore          Labelstore
-	i                   *mux.Router
-	e                   *mux.Router
-	healthy             bool
-}
-
-type Config struct {
-	Log struct {
-		Level     string `mapstructure:"level"`
-		LogTokens bool   `mapstructure:"log_tokens"`
-	} `mapstructure:"log"`
-
-	Web struct {
-		ProxyPort              int    `mapstructure:"proxy_port"`
-		MetricsPort            int    `mapstructure:"metrics_port"`
-		Host                   string `mapstructure:"host"`
-		InsecureSkipVerify     bool   `mapstructure:"insecure_skip_verify"`
-		TrustedRootCaPath      string `mapstructure:"trusted_root_ca_path"`
-		LabelStoreKind         string `mapstructure:"label_store_kind"`
-		JwksCertURL            string `mapstructure:"jwks_cert_url"`
-		KeycloakTokenGroupName string `mapstructure:"keycloak_token_group_name"`
-		ServiceAccountToken    string `mapstructure:"service_account_token"`
-	} `mapstructure:"web"`
-
-	Admin struct {
-		Bypass bool   `mapstructure:"bypass"`
-		Group  string `mapstructure:"group"`
-	} `mapstructure:"admin"`
-
-	Dev struct {
-		Enabled  bool   `mapstructure:"enabled"`
-		Username string `mapstructure:"username"`
-	} `mapstructure:"dev"`
-
-	Db struct {
-		Enabled      bool   `mapstructure:"enabled"`
-		User         string `mapstructure:"user"`
-		PasswordPath string `mapstructure:"password_path"`
-		Host         string `mapstructure:"host"`
-		Port         int    `mapstructure:"port"`
-		DbName       string `mapstructure:"dbName"`
-		Query        string `mapstructure:"query"`
-		TokenKey     string `mapstructure:"token_key"`
-	} `mapstructure:"db"`
-
-	Thanos struct {
-		URL          string `mapstructure:"url"`
-		TenantLabel  string `mapstructure:"tenant_label"`
-		UseMutualTLS bool   `mapstructure:"use_mutual_tls"`
-		Cert         string `mapstructure:"cert"`
-		Key          string `mapstructure:"key"`
-	} `mapstructure:"thanos"`
-	Loki struct {
-		URL          string `mapstructure:"url"`
-		TenantLabel  string `mapstructure:"tenant_label"`
-		UseMutualTLS bool   `mapstructure:"use_mutual_tls"`
-		Cert         string `mapstructure:"cert"`
-		Key          string `mapstructure:"key"`
-	} `mapstructure:"loki"`
-}
 
 func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
@@ -110,6 +43,8 @@ func main() {
 		WithLabelStore().
 		WithRoutes().
 		WithHealthz().
+		WithThanos().
+		WithLoki().
 		StartServer()
 
 	log.Info().Any("config", app.Cfg)
@@ -133,16 +68,16 @@ func (a *App) WithConfig() *App {
 		log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 	}
 	v.OnConfigChange(func(e fsnotify.Event) {
-		a.UpdateLogLevel()
 		log.Info().Str("file", e.Name).Msg("Config file changed")
 		err := v.Unmarshal(a.Cfg)
 		if err != nil {
 			log.Error().Err(err).Msg("Error while unmarshalling config file")
 			a.healthy = false
 		}
+		zerolog.SetGlobalLevel(zerolog.Level(a.Cfg.Log.Level))
 	})
 	v.WatchConfig()
-	a.UpdateLogLevel()
+	zerolog.SetGlobalLevel(zerolog.Level(a.Cfg.Log.Level))
 	return a
 }
 

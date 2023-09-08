@@ -4,25 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"io"
 	"net/http"
-	"strings"
-
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
-
-func (a *App) UpdateLogLevel() *App {
-	levels := map[string]int{
-		"debug": 0,
-		"info":  1,
-		"warn":  2,
-		"error": 3,
-		"fatal": 4,
-	}
-	zerolog.SetGlobalLevel(zerolog.Level(levels[strings.ToLower(a.Cfg.Log.Level)]))
-	return a
-}
 
 // requestData structure contains information about a HTTP request.
 type requestData struct {
