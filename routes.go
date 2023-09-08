@@ -28,7 +28,6 @@ const (
 var routes = []Route{
 	{Url: "/api/v1/query", MatchWord: "query"},
 	{Url: "/api/v1/query_range", MatchWord: "query"},
-	{Url: "/api/v1/label/{name}/values", MatchWord: "query"},
 	{Url: "/api/v1/series", MatchWord: "match[]"},
 	{Url: "/api/v1/tail", MatchWord: "query"},
 	{Url: "/api/v1/index/stats", MatchWord: "query"},

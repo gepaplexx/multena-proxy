@@ -38,6 +38,7 @@ func main() {
 	app := App{}
 	app.WithConfig().
 		logConfig().
+		WithSAT().
 		WithTLSConfig().
 		WithJWKS().
 		WithLabelStore().
