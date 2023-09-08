@@ -128,7 +128,7 @@ func (a *App) WithTLSConfig() *App {
 	var certificates []tls.Certificate
 
 	lokiCert, err := tls.LoadX509KeyPair(a.Cfg.Loki.Cert, a.Cfg.Loki.Key)
-	if err == nil {
+	if err != nil {
 		log.Error().Err(err).Msg("Error while loading loki certificate")
 	} else {
 		log.Debug().Str("path", a.Cfg.Loki.Cert).Msg("Adding Loki certificate")
@@ -136,7 +136,7 @@ func (a *App) WithTLSConfig() *App {
 	}
 
 	thanosCert, err := tls.LoadX509KeyPair(a.Cfg.Thanos.Cert, a.Cfg.Thanos.Key)
-	if err == nil {
+	if err != nil {
 		log.Error().Err(err).Msg("Error while loading thanos certificate")
 	} else {
 		log.Debug().Str("path", a.Cfg.Thanos.Cert).Msg("Adding Thanos certificate")
