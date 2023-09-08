@@ -53,6 +53,7 @@ func (r *Request) enforce(ls Labelstore, labelMatch string) error {
 
 func (r *Request) updateQuery(query string) {
 	values := r.URL.Query()
+	log.Trace().Str("match", r.queryMatch).Str("query", query).Msg("Updating query")
 	values.Set(r.queryMatch, query)
 	r.URL.RawQuery = values.Encode()
 }
