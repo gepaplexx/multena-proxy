@@ -12,7 +12,11 @@ type LogQLEnforcer Request
 
 func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool, labelMatch string) (string, error) {
 	if query == "" {
-		query = "{__name__=~\".+\"}"
+		operator := "="
+		if len(tenantLabels) > 1 {
+			operator = "=~"
+		}
+		return fmt.Sprintf("{%s%s\"%s\"}", labelMatch, operator, strings.Join(MapKeysToArray(tenantLabels), "|")), nil
 	}
 
 	expr, err := logqlv2.ParseExpr(query)
