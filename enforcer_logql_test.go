@@ -26,7 +26,7 @@ func TestLogqlEnforcer(t *testing.T) {
 			name:           "Empty query and valid tenant labels",
 			query:          "",
 			tenantLabels:   map[string]bool{"test": true},
-			expectedResult: "{__name__=~\".+\", kubernetes_namespace_name=\"test\"}",
+			expectedResult: "{kubernetes_namespace_name=\"test\"}",
 			expectErr:      false,
 		},
 		{
