@@ -56,6 +56,7 @@ func (r *Request) updateQuery(query string) {
 	log.Trace().Str("match", r.queryMatch).Str("query", query).Msg("Updating query")
 	values.Set(r.queryMatch, query)
 	r.URL.RawQuery = values.Encode()
+	log.Trace().Str("url", r.URL.String()).Msg("Updated URL")
 }
 
 func (r *Request) enforcePost(query string) error {
