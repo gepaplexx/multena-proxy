@@ -19,7 +19,6 @@ type Labelstore interface {
 }
 
 func (a *App) WithLabelStore() *App {
-	log.Debug().Str("type", a.Cfg.Web.LabelStoreKind).Msg("Using label store")
 	switch a.Cfg.Web.LabelStoreKind {
 	case "configmap":
 		a.LabelStore = &ConfigMapHandler{}
@@ -66,6 +65,7 @@ func (c *ConfigMapHandler) Connect(_ App) error {
 		}
 	})
 	v.WatchConfig()
+	log.Debug().Any("labels", c.labels).Msg("")
 	return nil
 }
 
