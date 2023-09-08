@@ -25,6 +25,8 @@ type Request struct {
 func (r *Request) enforce(ls Labelstore, labelMatch string) error {
 	token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
 	tenantLabels, skip := ls.GetLabels(token)
+	log.Trace().Any("token", token).Msg("Got token")
+	log.Trace().Any("labels", tenantLabels).Bool("skip", skip).Msg("Got labels")
 	if skip {
 		log.Debug().Str("user", token.PreferredUsername).Msg("Skipping label enforcement")
 		return nil
