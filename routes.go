@@ -76,6 +76,7 @@ func (a *App) WithLoki() *App {
 	lokiRouter := a.e.PathPrefix("/loki").Subrouter()
 	for _, route := range routes {
 		lokiRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
+			log.Debug().Any("route", route).Msg("Loki route")
 			req := Request{route.MatchWord, w, r, LogQLEnforcer{}}
 			err := req.enforce(a.LabelStore, a.Cfg.Loki.TenantLabel)
 			if err != nil {
@@ -98,6 +99,7 @@ func (a *App) WithThanos() *App {
 	thanosRouter := a.e.PathPrefix("").Subrouter()
 	for _, route := range routes {
 		thanosRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
+			log.Debug().Any("route", route).Msg("Thanos route")
 			req := Request{route.MatchWord, w, r, PromQLRequest{}}
 			err := req.enforce(a.LabelStore, a.Cfg.Thanos.TenantLabel)
 			if err != nil {
