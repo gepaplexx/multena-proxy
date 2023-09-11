@@ -87,7 +87,7 @@ func (a *App) WithSAT() *App {
 		a.ServiceAccountToken = a.Cfg.Web.ServiceAccountToken
 		return a
 	}
-	sa, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+	sa, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error while reading service account token")
 	}
