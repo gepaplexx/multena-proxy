@@ -79,6 +79,8 @@ func (r *Request) callUpstream(upstream *url.URL, useMutualTLS bool, sa string) 
 		log.Debug().Msg("Set Authorization header")
 	}
 
+	log.Trace().Any("request", r.Request).Msg("Request")
+
 	proxy := httputil.NewSingleHostReverseProxy(upstream)
 	proxy.ServeHTTP(r.ResponseWriter, r.Request)
 }
