@@ -9,9 +9,9 @@ import (
 	"github.com/prometheus/prometheus/promql/parser"
 )
 
-type PromQLRequest Request
+type PromQLEnforcer Request
 
-func (pqr PromQLRequest) EnforceQL(query string, allowedTenantLabels map[string]bool, labelMatch string) (string, error) {
+func (pqr PromQLEnforcer) EnforceQL(query string, allowedTenantLabels map[string]bool, labelMatch string) (string, error) {
 	if query == "" {
 		operator := "="
 		if len(allowedTenantLabels) > 1 {

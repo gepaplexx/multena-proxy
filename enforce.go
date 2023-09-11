@@ -16,14 +16,13 @@ type Enforcer interface {
 }
 
 type Request struct {
-	queryMatch string
 	http.ResponseWriter
 	*http.Request
 	Enforcer
 }
 
-func (r *Request) enforce(ls Labelstore, labelMatch string) error {
-	log.Trace().Str("match", r.queryMatch).Msg("")
+func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) error {
+	log.Trace().Str("match", queryMatch).Msg("")
 	token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
 	tenantLabels, skip := ls.GetLabels(token)
 	log.Trace().Any("token", token).Msg("Got token")
@@ -36,37 +35,37 @@ func (r *Request) enforce(ls Labelstore, labelMatch string) error {
 		logAndWriteError(r.ResponseWriter, http.StatusForbidden, nil, "No tenant labels found")
 		return fmt.Errorf("no tenant labels found")
 	}
-	query, err := r.EnforceQL(r.Request.URL.Query().Get(r.queryMatch), tenantLabels, labelMatch)
+	query, err := r.EnforceQL(r.Request.URL.Query().Get(queryMatch), tenantLabels, labelMatch)
 	if err != nil {
 		logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
 		return err
 	}
 	if r.Method == http.MethodPost {
-		err = r.enforcePost(query)
+		err = r.enforcePost(query, queryMatch)
 		if err != nil {
 			logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
 			return err
 		}
 	}
-	r.updateQuery(query)
+	r.updateQuery(query, queryMatch)
 	return nil
 }
 
-func (r *Request) updateQuery(query string) {
+func (r *Request) updateQuery(query string, qm string) {
 	values := r.URL.Query()
-	log.Trace().Str("match", r.queryMatch).Str("query", query).Msg("Updating query")
-	values.Set(r.queryMatch, query)
+	log.Trace().Str("match", qm).Str("query", query).Msg("Updating query")
+	values.Set(qm, query)
 	r.URL.RawQuery = values.Encode()
 	log.Trace().Str("url", r.URL.String()).Msg("Updated URL")
 }
 
-func (r *Request) enforcePost(query string) error {
+func (r *Request) enforcePost(query string, qm string) error {
 	if err := r.ParseForm(); err != nil {
 		return err
 	}
 	log.Debug().Interface("form", r.PostForm).Msg("Parsed form")
 	_ = r.Body.Close()
-	r.PostForm.Set(r.queryMatch, query)
+	r.PostForm.Set(qm, query)
 	newBody := r.PostForm.Encode()
 	r.Body = io.NopCloser(strings.NewReader(newBody))
 	r.ContentLength = int64(len(newBody))
