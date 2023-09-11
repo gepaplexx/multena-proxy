@@ -12,7 +12,7 @@ import (
 type LogQLEnforcer Request
 
 func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool, labelMatch string) (string, error) {
-	log.Trace().Str("query", query).Msg("enforcing")
+	log.Trace().Str("function", "enforcer").Str("query", query).Msg("enforcing")
 	if query == "" {
 		operator := "="
 		if len(tenantLabels) > 1 {
@@ -20,7 +20,7 @@ func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool, lab
 		}
 		return fmt.Sprintf("{%s%s\"%s\"}", labelMatch, operator, strings.Join(MapKeysToArray(tenantLabels), "|")), nil
 	}
-	log.Trace().Str("query", query).Msg("enforcing")
+	log.Trace().Str("function", "enforcer").Str("query", query).Msg("enforcing")
 
 	expr, err := logqlv2.ParseExpr(query)
 	if err != nil {
@@ -45,7 +45,7 @@ func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool, lab
 	if errMsg != nil {
 		return "", errMsg
 	}
-	log.Trace().Str("query", expr.String()).Msg("enforcing")
+	log.Trace().Str("function", "enforcer").Str("query", expr.String()).Msg("enforcing")
 	return expr.String(), nil
 }
 
