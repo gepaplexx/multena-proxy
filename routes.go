@@ -79,6 +79,7 @@ func (a *App) WithLoki() *App {
 		lokiRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
 			log.Trace().Any("route", route).Msg("Loki route")
 			req := Request{route.MatchWord, w, r, LogQLEnforcer{}}
+			log.Trace().Any("req", req).Msg("Loki route")
 			err := req.enforce(a.LabelStore, a.Cfg.Loki.TenantLabel)
 			if err != nil {
 				return
@@ -103,6 +104,7 @@ func (a *App) WithThanos() *App {
 		thanosRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
 			log.Trace().Any("route", route).Msg("Thanos route")
 			req := Request{route.MatchWord, w, r, PromQLRequest{}}
+			log.Trace().Any("req", req).Msg("Thanos route")
 			err := req.enforce(a.LabelStore, a.Cfg.Thanos.TenantLabel)
 			if err != nil {
 				return
