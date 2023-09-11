@@ -77,10 +77,8 @@ func (a *App) WithLoki() *App {
 	for _, route := range routes {
 		log.Trace().Any("route", route).Msg("Loki route")
 		lokiRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
-			log.Trace().Any("route", route).Msg("Loki route")
-			req := Request{route.MatchWord, w, r, LogQLEnforcer{}}
-			log.Trace().Any("req", req.queryMatch).Msg("Loki route")
-			err := req.enforce(a.LabelStore, a.Cfg.Loki.TenantLabel)
+			req := Request{w, r, LogQLEnforcer{}}
+			err := req.enforce(route.MatchWord, a.LabelStore, a.Cfg.Loki.TenantLabel)
 			if err != nil {
 				return
 			}
@@ -101,16 +99,24 @@ func (a *App) WithThanos() *App {
 	thanosRouter := a.e.PathPrefix("").Subrouter()
 	for _, route := range routes {
 		log.Trace().Any("route", route).Msg("Thanos route")
-		thanosRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
-			log.Trace().Any("route", route).Msg("Thanos route")
-			req := Request{route.MatchWord, w, r, PromQLRequest{}}
-			log.Trace().Any("req", req.queryMatch).Msg("Thanos route")
-			err := req.enforce(a.LabelStore, a.Cfg.Thanos.TenantLabel)
-			if err != nil {
-				return
-			}
-			req.callUpstream(thanosUrl, a.Cfg.Thanos.UseMutualTLS, a.ServiceAccountToken)
-		}).Name(route.Url)
+		thanosRouter.HandleFunc(route.Url, handler(route.MatchWord, PromQLEnforcer{},
+			a.LabelStore,
+			a.Cfg.Thanos.TenantLabel,
+			thanosUrl,
+			a.Cfg.Thanos.UseMutualTLS,
+			a.ServiceAccountToken)).Name(route.Url)
 	}
 	return a
+}
+
+func handler(matchWord string, enforcer Enforcer, ls Labelstore, tl string, url *url.URL, tls bool, sat string) func(http.ResponseWriter, *http.Request) {
+	fun := func(w http.ResponseWriter, r *http.Request) {
+		req := Request{w, r, enforcer}
+		err := req.enforce(matchWord, ls, tl)
+		if err != nil {
+			return
+		}
+		req.callUpstream(url, tls, sat)
+	}
+	return fun
 }
