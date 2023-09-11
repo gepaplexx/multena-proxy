@@ -81,7 +81,7 @@ func (a *App) WithLoki() *App {
 			if err != nil {
 				return
 			}
-			req.callUpstream(lokiUrl, a.Cfg.Thanos.UseMutualTLS, a.ServiceAccountToken)
+			req.callUpstream(lokiUrl, a.Cfg.Loki.UseMutualTLS, a.ServiceAccountToken)
 		})
 	}
 	return a
@@ -103,7 +103,7 @@ func (a *App) WithThanos() *App {
 			if err != nil {
 				return
 			}
-			req.callUpstream(thanosUrl, a.Cfg.Loki.UseMutualTLS, a.ServiceAccountToken)
+			req.callUpstream(thanosUrl, a.Cfg.Thanos.UseMutualTLS, a.ServiceAccountToken)
 		})
 	}
 	return a
