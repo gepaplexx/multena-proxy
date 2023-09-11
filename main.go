@@ -91,7 +91,7 @@ func (a *App) WithSAT() *App {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error while reading service account token")
 	}
-	a.Cfg.Web.ServiceAccountToken = string(sa)
+	a.ServiceAccountToken = string(sa)
 	return a
 }
 
