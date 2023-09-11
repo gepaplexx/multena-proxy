@@ -23,6 +23,7 @@ type Request struct {
 }
 
 func (r *Request) enforce(ls Labelstore, labelMatch string) error {
+	log.Trace().Str("match", r.queryMatch).Msg("")
 	token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
 	tenantLabels, skip := ls.GetLabels(token)
 	log.Trace().Any("token", token).Msg("Got token")

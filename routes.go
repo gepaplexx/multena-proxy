@@ -84,7 +84,7 @@ func (a *App) WithLoki() *App {
 				return
 			}
 			req.callUpstream(lokiUrl, a.Cfg.Loki.UseMutualTLS, a.ServiceAccountToken)
-		})
+		}).Name(route.Url)
 	}
 	return a
 }
@@ -108,7 +108,7 @@ func (a *App) WithThanos() *App {
 				return
 			}
 			req.callUpstream(thanosUrl, a.Cfg.Thanos.UseMutualTLS, a.ServiceAccountToken)
-		})
+		}).Name(route.Url)
 	}
 	return a
 }
