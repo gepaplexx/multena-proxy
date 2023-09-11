@@ -76,14 +76,12 @@ func (a *App) WithLoki() *App {
 	lokiRouter := a.e.PathPrefix("/loki").Subrouter()
 	for _, route := range routes {
 		log.Trace().Any("route", route).Msg("Loki route")
-		lokiRouter.HandleFunc(route.Url, func(w http.ResponseWriter, r *http.Request) {
-			req := Request{w, r, LogQLEnforcer{}}
-			err := req.enforce(route.MatchWord, a.LabelStore, a.Cfg.Loki.TenantLabel)
-			if err != nil {
-				return
-			}
-			req.callUpstream(lokiUrl, a.Cfg.Loki.UseMutualTLS, a.ServiceAccountToken)
-		}).Name(route.Url)
+		lokiRouter.HandleFunc(route.Url, handler(route.MatchWord, LogQLEnforcer{},
+			a.LabelStore,
+			a.Cfg.Loki.TenantLabel,
+			lokiUrl,
+			a.Cfg.Loki.UseMutualTLS,
+			a.ServiceAccountToken)).Name(route.Url)
 	}
 	return a
 }

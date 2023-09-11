@@ -36,6 +36,7 @@ func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) e
 		return fmt.Errorf("no tenant labels found")
 	}
 	query, err := r.EnforceQL(r.Request.URL.Query().Get(queryMatch), tenantLabels, labelMatch)
+
 	if err != nil {
 		logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
 		return err

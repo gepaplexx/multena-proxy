@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"strings"
 
 	enforcer "github.com/prometheus-community/prom-label-proxy/injectproxy"
@@ -12,6 +13,7 @@ import (
 type PromQLEnforcer Request
 
 func (pqr PromQLEnforcer) EnforceQL(query string, allowedTenantLabels map[string]bool, labelMatch string) (string, error) {
+	log.Trace().Str("query", query).Msg("enforcing")
 	if query == "" {
 		operator := "="
 		if len(allowedTenantLabels) > 1 {
@@ -23,6 +25,7 @@ func (pqr PromQLEnforcer) EnforceQL(query string, allowedTenantLabels map[string
 			strings.Join(MapKeysToArray(allowedTenantLabels),
 				"|"))
 	}
+	log.Trace().Str("query", query).Msg("enforcing")
 	expr, err := parser.ParseExpr(query)
 	if err != nil {
 		return "", err
@@ -43,6 +46,7 @@ func (pqr PromQLEnforcer) EnforceQL(query string, allowedTenantLabels map[string
 	if err != nil {
 		return "", err
 	}
+	log.Trace().Str("query", expr.String()).Msg("enforcing")
 	return expr.String(), nil
 }
 
