@@ -195,4 +195,7 @@ jobs:
           INITIAL_VERSION: 0.5.1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
-          DEFAULT_BUMP: patch
+          DRY_RUN: true
+          DEFAULT_BUMP: minor
+          VERBOSE: true
+          BRANCH_HISTORY: last
