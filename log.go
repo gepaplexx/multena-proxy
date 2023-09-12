@@ -59,7 +59,7 @@ func logRequestData(r *http.Request, bodyBytes []byte, logToken bool) {
 		log.Error().Err(err).Msg("Error while marshalling request")
 		return
 	}
-	log.Debug().Str("request", string(jsonData)).Str("path", r.URL.Path).Msg("")
+	log.Debug().Str("verb", r.Method).Str("request", string(jsonData)).Str("path", r.URL.Path).Msg("")
 }
 
 // cleanSensitiveHeaders function is like removing personal details from the letter before it's recorded or read by someone else.
