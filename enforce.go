@@ -52,6 +52,9 @@ func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) e
 		values.Set(queryMatch, query)
 		r.URL.RawQuery = values.Encode()
 		log.Trace().Str("url", r.URL.String()).Msg("Updated URL")
+
+		r.Body = io.NopCloser(strings.NewReader(""))
+		r.ContentLength = 0
 		return nil
 	}
 
@@ -71,6 +74,7 @@ func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) e
 		newBody := r.PostForm.Encode()
 		r.Body = io.NopCloser(strings.NewReader(newBody))
 		r.ContentLength = int64(len(newBody))
+		r.URL.RawQuery = ""
 		return nil
 	}
 	logAndWriteError(r.ResponseWriter, http.StatusForbidden, nil, "Invalid method")
