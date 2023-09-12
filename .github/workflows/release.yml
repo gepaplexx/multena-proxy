@@ -125,7 +125,6 @@ jobs:
           WITH_V: true
           DRY_RUN: true
           DEFAULT_BUMP: patch
-          VERBOSE: true
           RELEASE_BRANCHES: main
 
       - name: Docker meta
@@ -197,7 +196,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
-          DRY_RUN: true
+          DRY_RUN: false
           DEFAULT_BUMP: patch
-          VERBOSE: true
           RELEASE_BRANCHES: main
