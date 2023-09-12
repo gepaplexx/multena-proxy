@@ -23,7 +23,7 @@ type Request struct {
 
 func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) error {
 	log.Trace().Str("match", queryMatch).Msg("")
-	log.Trace().Str("query", r.Request.URL.Query().Get("query")).Str("match[]", r.Request.URL.Query().Get("match[]")).Msg("")
+	log.Trace().Str("kind", "urlmatch").Str("query", r.Request.URL.Query().Get("query")).Str("match[]", r.Request.URL.Query().Get("match[]")).Msg("")
 	token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
 	tenantLabels, skip := ls.GetLabels(token)
 	log.Trace().Any("token", token).Msg("Got token")
