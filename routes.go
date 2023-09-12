@@ -53,7 +53,7 @@ func (a *App) WithHealthz() *App {
 }
 
 func (a *App) WithLoki() *App {
-	var routes = []Route{
+	routes := []Route{
 		{Url: "/api/v1/query", MatchWord: "query"},
 		{Url: "/api/v1/query_range", MatchWord: "query"},
 		{Url: "/api/v1/series", MatchWord: "match[]"},
@@ -86,7 +86,7 @@ func (a *App) WithLoki() *App {
 }
 
 func (a *App) WithThanos() *App {
-	var routes = []Route{
+	routes := []Route{
 		{Url: "/api/v1/query", MatchWord: "query"},
 		{Url: "/api/v1/query_range", MatchWord: "query"},
 		{Url: "/api/v1/series", MatchWord: "match[]"},
