@@ -1,4 +1,4 @@
-name: Publish new release
+name: CI
 
 on:
   push:
