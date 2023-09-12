@@ -121,8 +121,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
           DRY_RUN: true
-          DEFAULT_BUMP: patch
+          DEFAULT_BUMP: minor
           VERBOSE: true
+          BRANCH_HISTORY: last
 
       - name: Docker meta
         id: meta
