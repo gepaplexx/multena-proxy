@@ -24,7 +24,11 @@ type Request struct {
 func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) error {
 	log.Trace().Str("match", queryMatch).Msg("")
 	log.Trace().Str("kind", "urlmatch").Str("query", r.Request.URL.Query().Get("query")).Str("match[]", r.Request.URL.Query().Get("match[]")).Msg("")
-	token := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
+	token, ok := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
+	if !ok {
+		logAndWriteError(r.ResponseWriter, http.StatusForbidden, nil, "No token found")
+		return fmt.Errorf("no token found")
+	}
 	tenantLabels, skip := ls.GetLabels(token)
 	log.Trace().Any("token", token).Msg("Got token")
 	log.Trace().Any("labels", tenantLabels).Bool("skip", skip).Msg("Got labels")
@@ -36,16 +40,25 @@ func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) e
 		logAndWriteError(r.ResponseWriter, http.StatusForbidden, nil, "No tenant labels found")
 		return fmt.Errorf("no tenant labels found")
 	}
-	query, err := r.EnforceQL(r.Request.URL.Query().Get(queryMatch), tenantLabels, labelMatch)
-	if err != nil {
-		logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
-		return err
+
+	if r.Method == http.MethodGet {
+		query, err := r.EnforceQL(r.Request.URL.Query().Get(queryMatch), tenantLabels, labelMatch)
+		if err != nil {
+			logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
+			return err
+		}
+		values := r.URL.Query()
+		log.Trace().Str("match", queryMatch).Str("query", query).Msg("Updating query")
+		values.Set(queryMatch, query)
+		r.URL.RawQuery = values.Encode()
+		log.Trace().Str("url", r.URL.String()).Msg("Updated URL")
+		return nil
 	}
+
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
 		}
-		_ = r.Body.Close()
 		log.Trace().Str("kind", "urlmatch").Str("query", r.PostForm.Get("query")).Str("match[]", r.PostForm.Get("match[]")).Msg("")
 		query := r.PostForm.Get(queryMatch)
 		query, err := r.EnforceQL(query, tenantLabels, labelMatch)
@@ -53,26 +66,15 @@ func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) e
 			logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
 			return err
 		}
-
-		if err != nil {
-			logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
-			return err
-		}
+		_ = r.Body.Close()
 		r.PostForm.Set(queryMatch, query)
 		newBody := r.PostForm.Encode()
 		r.Body = io.NopCloser(strings.NewReader(newBody))
 		r.ContentLength = int64(len(newBody))
+		return nil
 	}
-	r.updateQuery(query, queryMatch)
-	return nil
-}
-
-func (r *Request) updateQuery(query, qm string) {
-	values := r.URL.Query()
-	log.Trace().Str("match", qm).Str("query", query).Msg("Updating query")
-	values.Set(qm, query)
-	r.URL.RawQuery = values.Encode()
-	log.Trace().Str("url", r.URL.String()).Msg("Updated URL")
+	logAndWriteError(r.ResponseWriter, http.StatusForbidden, nil, "Invalid method")
+	return fmt.Errorf("invalid method")
 }
 
 func (r *Request) callUpstream(upstream *url.URL, useMutualTLS bool, sa string) {
