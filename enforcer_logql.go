@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	logqlv2 "github.com/observatorium/api/logql/v2"
 	"github.com/prometheus/prometheus/model/labels"

@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	enforcer "github.com/prometheus-community/prom-label-proxy/injectproxy"
 	"github.com/prometheus/prometheus/model/labels"

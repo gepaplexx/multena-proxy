@@ -79,7 +79,7 @@ func parseJwtToken(tokenString string, a *App) (KeycloakToken, *jwt.Token, error
 }
 
 func isValidToken(token *jwt.Token, cfg Config) bool {
-	return token.Valid || cfg.Dev.Enabled
+	return token.Valid //|| cfg.Dev.Enabled
 }
 
 func isAdmin(token KeycloakToken, cfg Config) bool {
