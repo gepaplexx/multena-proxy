@@ -101,6 +101,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: '0'
+
       - uses: actions/cache@v3
         with:
           path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
@@ -121,9 +125,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
           DRY_RUN: true
-          DEFAULT_BUMP: minor
+          DEFAULT_BUMP: patch
           VERBOSE: true
-          BRANCH_HISTORY: last
+          RELEASE_BRANCHES: main
 
       - name: Docker meta
         id: meta
@@ -196,6 +200,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
           DRY_RUN: true
-          DEFAULT_BUMP: minor
+          DEFAULT_BUMP: patch
           VERBOSE: true
-          BRANCH_HISTORY: last
+          RELEASE_BRANCHES: main
