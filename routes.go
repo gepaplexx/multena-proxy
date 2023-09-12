@@ -25,19 +25,6 @@ const (
 	KeycloakCtxToken contextKey = "keycloakToken"
 )
 
-var routes = []Route{
-	{Url: "/api/v1/query", MatchWord: "query"},
-	{Url: "/api/v1/query_range", MatchWord: "query"},
-	{Url: "/api/v1/series", MatchWord: "match[]"},
-	{Url: "/api/v1/tail", MatchWord: "query"},
-	{Url: "/api/v1/index/stats", MatchWord: "query"},
-	{Url: "/api/v1/format_query", MatchWord: "query"},
-	{Url: "/api/v1/labels", MatchWord: "match[]"},
-	{Url: "/api/v1/label/{label}/values", MatchWord: "match[]"},
-	{Url: "/api/v1/query_exemplars", MatchWord: "query"},
-	{Url: "/api/v1/status/buildinfo", MatchWord: "query"},
-}
-
 func (a *App) WithRoutes() *App {
 	e := mux.NewRouter()
 	e.Use(a.loggingMiddleware)
@@ -66,6 +53,18 @@ func (a *App) WithHealthz() *App {
 }
 
 func (a *App) WithLoki() *App {
+	var routes = []Route{
+		{Url: "/api/v1/query", MatchWord: "query"},
+		{Url: "/api/v1/query_range", MatchWord: "query"},
+		{Url: "/api/v1/series", MatchWord: "match[]"},
+		{Url: "/api/v1/tail", MatchWord: "query"},
+		{Url: "/api/v1/index/stats", MatchWord: "query"},
+		{Url: "/api/v1/format_query", MatchWord: "query"},
+		{Url: "/api/v1/labels", MatchWord: "query"},
+		{Url: "/api/v1/label/{label}/values", MatchWord: "query"},
+		{Url: "/api/v1/query_exemplars", MatchWord: "query"},
+		{Url: "/api/v1/status/buildinfo", MatchWord: "query"},
+	}
 	if a.Cfg.Loki.URL == "" {
 		return a
 	}
@@ -87,6 +86,18 @@ func (a *App) WithLoki() *App {
 }
 
 func (a *App) WithThanos() *App {
+	var routes = []Route{
+		{Url: "/api/v1/query", MatchWord: "query"},
+		{Url: "/api/v1/query_range", MatchWord: "query"},
+		{Url: "/api/v1/series", MatchWord: "match[]"},
+		{Url: "/api/v1/tail", MatchWord: "query"},
+		{Url: "/api/v1/index/stats", MatchWord: "query"},
+		{Url: "/api/v1/format_query", MatchWord: "query"},
+		{Url: "/api/v1/labels", MatchWord: "match[]"},
+		{Url: "/api/v1/label/{label}/values", MatchWord: "match[]"},
+		{Url: "/api/v1/query_exemplars", MatchWord: "query"},
+		{Url: "/api/v1/status/buildinfo", MatchWord: "query"},
+	}
 	if a.Cfg.Thanos.URL == "" {
 		return a
 	}
