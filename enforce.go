@@ -23,7 +23,6 @@ type Request struct {
 
 func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) error {
 	log.Trace().Str("match", queryMatch).Msg("")
-	log.Trace().Str("kind", "urlmatch").Str("query", r.Request.URL.Query().Get("query")).Str("match[]", r.Request.URL.Query().Get("match[]")).Msg("")
 	token, ok := r.Context().Value(KeycloakCtxToken).(KeycloakToken)
 	if !ok {
 		logAndWriteError(r.ResponseWriter, http.StatusForbidden, nil, "No token found")
@@ -42,6 +41,7 @@ func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) e
 	}
 
 	if r.Method == http.MethodGet {
+		log.Trace().Str("kind", "urlmatch").Str("query", r.Request.URL.Query().Get("query")).Str("match[]", r.Request.URL.Query().Get("match[]")).Msg("")
 		query, err := r.EnforceQL(r.Request.URL.Query().Get(queryMatch), tenantLabels, labelMatch)
 		if err != nil {
 			logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
@@ -62,7 +62,7 @@ func (r *Request) enforce(queryMatch string, ls Labelstore, labelMatch string) e
 		if err := r.ParseForm(); err != nil {
 			logAndWriteError(r.ResponseWriter, http.StatusForbidden, err, "")
 		}
-		log.Trace().Str("kind", "urlmatch").Str("query", r.PostForm.Get("query")).Str("match[]", r.PostForm.Get("match[]")).Msg("")
+		log.Trace().Str("kind", "bodymatch").Str("query", r.PostForm.Get("query")).Str("match[]", r.PostForm.Get("match[]")).Msg("")
 		query := r.PostForm.Get(queryMatch)
 		query, err := r.EnforceQL(query, tenantLabels, labelMatch)
 		if err != nil {
