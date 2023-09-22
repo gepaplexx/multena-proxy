@@ -330,15 +330,15 @@ func Test_reverseProxy(t *testing.T) {
 func TestIsAdminSkip(t *testing.T) {
 	a := assert.New(t)
 
-	app := App{}
+	app := &App{}
 	app.WithConfig()
 	app.Cfg.Admin.Bypass = true
 	app.Cfg.Admin.Group = "gepardec-run-admins"
 	token := &KeycloakToken{Groups: []string{"gepardec-run-admins"}}
-	a.True(isAdmin(*token, *app.Cfg))
+	a.True(isAdmin(*token, app))
 
 	token.Groups = []string{"user"}
-	a.False(isAdmin(*token, *app.Cfg))
+	a.False(isAdmin(*token, app))
 }
 
 func TestLogAndWriteError(t *testing.T) {

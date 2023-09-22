@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"net/http/httputil"
 	"net/http/pprof"
 	"net/url"
 
@@ -17,18 +19,9 @@ type Route struct {
 	MatchWord string
 }
 
-// contextKey is a string type that represents a context key.
-type contextKey string
-
-// KeycloakCtxToken are the context keys used in the application.
-const (
-	KeycloakCtxToken contextKey = "keycloakToken"
-)
-
 func (a *App) WithRoutes() *App {
 	e := mux.NewRouter()
 	e.Use(a.loggingMiddleware)
-	e.Use(a.authMiddleware)
 	e.SkipClean(true)
 	a.e = e
 	return a
@@ -75,12 +68,12 @@ func (a *App) WithLoki() *App {
 	lokiRouter := a.e.PathPrefix("/loki").Subrouter()
 	for _, route := range routes {
 		log.Trace().Any("route", route).Msg("Loki route")
-		lokiRouter.HandleFunc(route.Url, handler(route.MatchWord, LogQLEnforcer{},
-			a.LabelStore,
+		lokiRouter.HandleFunc(route.Url, handler(route.MatchWord,
+			LogQLEnforcer(struct{}{}),
 			a.Cfg.Loki.TenantLabel,
 			lokiUrl,
 			a.Cfg.Loki.UseMutualTLS,
-			a.ServiceAccountToken)).Name(route.Url)
+			a)).Name(route.Url)
 	}
 	return a
 }
@@ -108,24 +101,74 @@ func (a *App) WithThanos() *App {
 	thanosRouter := a.e.PathPrefix("").Subrouter()
 	for _, route := range routes {
 		log.Trace().Any("route", route).Msg("Thanos route")
-		thanosRouter.HandleFunc(route.Url, handler(route.MatchWord, PromQLEnforcer{},
-			a.LabelStore,
-			a.Cfg.Thanos.TenantLabel,
-			thanosUrl,
-			a.Cfg.Thanos.UseMutualTLS,
-			a.ServiceAccountToken)).Name(route.Url)
+		thanosRouter.HandleFunc(route.Url,
+			handler(route.MatchWord,
+				PromQLEnforcer(struct{}{}),
+				a.Cfg.Thanos.TenantLabel,
+				thanosUrl,
+				a.Cfg.Thanos.UseMutualTLS,
+				a)).Name(route.Url)
+
 	}
 	return a
 }
 
-func handler(matchWord string, enforcer Enforcer, ls Labelstore, tl string, url *url.URL, tls bool, sat string) func(http.ResponseWriter, *http.Request) {
-	fun := func(w http.ResponseWriter, r *http.Request) {
-		req := Request{w, r, enforcer}
-		err := req.enforce(matchWord, ls, tl)
+func handler(matchWord string, enforcer EnforceQL, tl string, url *url.URL, tls bool, a *App) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var tenantLabels map[string]bool
+		var err error
+		var skip bool
+		authToken, err := getBearerToken(r)
 		if err != nil {
+			logAndWriteError(w, http.StatusForbidden, err, "")
 			return
 		}
-		req.callUpstream(url, tls, sat)
+
+		keycloakToken, token, err := parseJwtToken(authToken, a)
+		if err != nil {
+			logAndWriteError(w, http.StatusForbidden, err, "error parsing Keycloak token")
+			return
+		}
+		if !token.Valid {
+			logAndWriteError(w, http.StatusForbidden, nil, "invalid token")
+			return
+		}
+
+		if isAdmin(keycloakToken, a) {
+			goto streamup
+		}
+
+		tenantLabels, skip = a.LabelStore.GetLabels(keycloakToken)
+		if skip {
+			log.Debug().Str("user", keycloakToken.PreferredUsername).Msg("Skipping label enforcement")
+			goto streamup
+		}
+
+		if len(tenantLabels) < 1 {
+			logAndWriteError(w, http.StatusForbidden, nil, "No tenant labels found")
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			err = enforceGet(r, enforcer, tenantLabels, tl, matchWord)
+		case http.MethodPost:
+			err = enforcePost(r, enforcer, tenantLabels, tl, matchWord)
+		default:
+			logAndWriteError(w, http.StatusForbidden, nil, "Invalid method")
+			return
+		}
+		if err != nil {
+			logAndWriteError(w, http.StatusForbidden, err, "")
+			return
+		}
+
+	streamup:
+
+		if !tls {
+			r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.ServiceAccountToken))
+		}
+		proxy := httputil.NewSingleHostReverseProxy(url)
+		proxy.ServeHTTP(w, r)
 	}
-	return fun
 }

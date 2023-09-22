@@ -10,7 +10,7 @@ import (
 type App struct {
 	Jwks                *keyfunc.JWKS
 	Cfg                 *Config
-	Tls                 *tls.Config
+	TlS                 *tls.Config
 	ServiceAccountToken string
 	LabelStore          Labelstore
 	i                   *mux.Router

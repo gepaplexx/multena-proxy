@@ -11,9 +11,9 @@ import (
 	"github.com/prometheus/prometheus/promql/parser"
 )
 
-type PromQLEnforcer Request
+type PromQLEnforcer struct{}
 
-func (pqr PromQLEnforcer) EnforceQL(query string, allowedTenantLabels map[string]bool, labelMatch string) (string, error) {
+func (PromQLEnforcer) Enforce(query string, allowedTenantLabels map[string]bool, labelMatch string) (string, error) {
 	log.Trace().Str("function", "enforcer").Str("query", query).Msg("enforcing")
 	if query == "" {
 		operator := "="

@@ -77,9 +77,9 @@ func cleanSensitiveHeaders(headers http.Header) http.Header {
 // logAndWriteError function is used when something goes wrong in the server, like an error. It takes note of the error and tells the requester about it.
 func logAndWriteError(rw http.ResponseWriter, statusCode int, err error, message string) {
 	if message == "" {
-		message = err.Error()
+		message = fmt.Sprint(err)
 	}
-	log.Debug().Err(err).Msg(message)
+	log.Trace().Err(err).Msg(message)
 	rw.WriteHeader(statusCode)
 	_, _ = fmt.Fprint(rw, message+"\n")
 }

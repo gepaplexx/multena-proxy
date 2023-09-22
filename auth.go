@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -14,30 +13,6 @@ type KeycloakToken struct {
 	PreferredUsername string   `json:"preferred_username"`
 	Email             string   `json:"email"`
 	jwt.RegisteredClaims
-}
-
-func (a *App) authMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authToken, err := getBearerToken(r)
-		if err != nil {
-			logAndWriteError(w, http.StatusForbidden, err, "")
-			return
-		}
-
-		keycloakToken, token, err := parseJwtToken(authToken, a)
-		if err != nil && !a.Cfg.Dev.Enabled {
-			logAndWriteError(w, http.StatusForbidden, err, "error parsing Keycloak token\n")
-			return
-		}
-
-		if !isValidToken(token, *a.Cfg) {
-			logAndWriteError(w, http.StatusForbidden, nil, "invalid token")
-			return
-		}
-
-		r = withKeyCloakContext(r, keycloakToken)
-		next.ServeHTTP(w, r)
-	})
 }
 
 func getBearerToken(r *http.Request) (string, error) {
@@ -79,14 +54,9 @@ func parseJwtToken(tokenString string, a *App) (KeycloakToken, *jwt.Token, error
 }
 
 func isValidToken(token *jwt.Token, cfg Config) bool {
-	return token.Valid //|| cfg.Dev.Enabled
+	return token.Valid || cfg.Dev.Enabled
 }
 
-func isAdmin(token KeycloakToken, cfg Config) bool {
-	return ContainsIgnoreCase(token.Groups, cfg.Admin.Group) && cfg.Admin.Bypass
-}
-
-func withKeyCloakContext(r *http.Request, keycloakToken KeycloakToken) *http.Request {
-	ctx := context.WithValue(r.Context(), KeycloakCtxToken, keycloakToken)
-	return r.WithContext(ctx)
+func isAdmin(token KeycloakToken, a *App) bool {
+	return ContainsIgnoreCase(token.Groups, a.Cfg.Admin.Group) && a.Cfg.Admin.Bypass
 }

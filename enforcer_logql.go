@@ -10,9 +10,9 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 )
 
-type LogQLEnforcer Request
+type LogQLEnforcer struct{}
 
-func (r LogQLEnforcer) EnforceQL(query string, tenantLabels map[string]bool, labelMatch string) (string, error) {
+func (LogQLEnforcer) Enforce(query string, tenantLabels map[string]bool, labelMatch string) (string, error) {
 	log.Trace().Str("function", "enforcer").Str("query", query).Msg("enforcing")
 	if query == "" {
 		operator := "="
