@@ -85,7 +85,7 @@ jobs:
         run: go get .
 
       - name: Build
-        run: CGO_ENABLED=0 GOOS=linux go build -ldflags="-X main.Commit=$(git rev-parse HEAD)" -o . -v ./...
+        run: CGO_ENABLED=0 GOOS=linux GOEXPERIMENT=loopvar go build -ldflags="-X main.Commit=$(git rev-parse HEAD)" -o . -v ./...
 
       - name: Change permissions
         run: | 
