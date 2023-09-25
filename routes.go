@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"golang.org/x/exp/maps"
 	"net/http"
 	"net/http/httputil"
 	"net/http/pprof"
@@ -135,14 +136,16 @@ func handler(matchWord string, enforcer EnforceQL, tl string, url *url.URL, tls 
 		}
 
 		if isAdmin(keycloakToken, a) {
+			log.Debug().Str("user", keycloakToken.PreferredUsername).Bool("Admin", true).Msg("Skipping label enforcement")
 			goto streamup
 		}
 
 		tenantLabels, skip = a.LabelStore.GetLabels(keycloakToken)
 		if skip {
-			log.Debug().Str("user", keycloakToken.PreferredUsername).Msg("Skipping label enforcement")
+			log.Debug().Str("user", keycloakToken.PreferredUsername).Bool("Admin", false).Msg("Skipping label enforcement")
 			goto streamup
 		}
+		log.Debug().Str("user", keycloakToken.PreferredUsername).Strs("labels", maps.Keys(tenantLabels)).Msg("")
 
 		if len(tenantLabels) < 1 {
 			logAndWriteError(w, http.StatusForbidden, nil, "No tenant labels found")
