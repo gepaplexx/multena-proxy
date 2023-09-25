@@ -26,7 +26,7 @@ func (a *App) loggingMiddleware(next http.Handler) http.Handler {
 		} else {
 			bodyBytes = []byte("[REDACTED]")
 		}
-		log.Debug().Str("Request", fmt.Sprintf("%+v", r.Header)).Msg("")
+		log.Debug().Any("Request", r.Header).Msg("")
 		logRequestData(r, bodyBytes, a.Cfg.Log.LogTokens)
 		next.ServeHTTP(w, r)
 		log.Debug().Str("path", r.URL.Path).Msg("Request complete")
