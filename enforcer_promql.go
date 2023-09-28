@@ -14,7 +14,7 @@ import (
 type PromQLEnforcer struct{}
 
 func (PromQLEnforcer) Enforce(query string, allowedTenantLabels map[string]bool, labelMatch string) (string, error) {
-	log.Trace().Str("function", "enforcer").Str("query", query).Msg("enforcing")
+	log.Trace().Str("function", "enforcer").Str("query", query).Msg("input")
 	if query == "" {
 		operator := "="
 		if len(allowedTenantLabels) > 1 {

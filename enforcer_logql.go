@@ -13,13 +13,15 @@ import (
 type LogQLEnforcer struct{}
 
 func (LogQLEnforcer) Enforce(query string, tenantLabels map[string]bool, labelMatch string) (string, error) {
-	log.Trace().Str("function", "enforcer").Str("query", query).Msg("enforcing")
+	log.Trace().Str("function", "enforcer").Str("query", query).Msg("input")
 	if query == "" {
 		operator := "="
 		if len(tenantLabels) > 1 {
 			operator = "=~"
 		}
-		return fmt.Sprintf("{%s%s\"%s\"}", labelMatch, operator, strings.Join(MapKeysToArray(tenantLabels), "|")), nil
+		query = fmt.Sprintf("{%s%s\"%s\"}", labelMatch, operator, strings.Join(MapKeysToArray(tenantLabels), "|"))
+		log.Trace().Str("function", "enforcer").Str("query", query).Msg("enforcing")
+		return query, nil
 	}
 	log.Trace().Str("function", "enforcer").Str("query", query).Msg("enforcing")
 
