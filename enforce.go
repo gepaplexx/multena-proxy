@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -10,6 +11,17 @@ import (
 
 type EnforceQL interface {
 	Enforce(query string, tenantLabels map[string]bool, labelMatch string) (string, error)
+}
+
+func enforceRequest(r *http.Request, enforce EnforceQL, tenantLabels map[string]bool, labelMatch string, queryMatch string) error {
+	switch r.Method {
+	case http.MethodGet:
+		return enforceGet(r, enforce, tenantLabels, labelMatch, queryMatch)
+	case http.MethodPost:
+		return enforcePost(r, enforce, tenantLabels, labelMatch, queryMatch)
+	default:
+		return fmt.Errorf("invalid method")
+	}
 }
 
 func enforceGet(r *http.Request, enforce EnforceQL, tenantLabels map[string]bool, labelMatch string, queryMatch string) error {

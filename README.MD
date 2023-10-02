@@ -193,7 +193,7 @@ cluster.
 
 This mode only makes sense if you have a MySQL database with a systematic way to get the permissions for a user. The
 query should return a list of labels for a user. The query should be configured in the config.yaml file. It is also
-important to enable caching for this database as the query will be executed for every request. For example if you have
+important to enable caching for this database as the query will be executed for every request. For example, if you have
 a Dashboard with 10 panels, the query will be executed 10 times.
 
 ### config.yaml

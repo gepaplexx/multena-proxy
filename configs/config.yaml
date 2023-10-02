@@ -11,14 +11,14 @@ web:
   label_store_kind: "configmap"
   jwks_cert_url: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
   service_account_token: "fake"
-  keycloak_token_group_name: "groups"
+  oauth_group_name: "groups"
 
 admin:
   bypass: true
   group: gepardec-run-admins
 
 dev:
-  enabled: false
+  enabled: true
   username: example
 
 
@@ -42,3 +42,5 @@ loki:
   tenant_label: kubernetes_namespace_name
   cert: "./certs/loki/tls.crt"
   key: "./certs/loki/tls.key"
+  Header:
+    "X-Scope-OrgID": "application"

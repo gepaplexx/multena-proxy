@@ -155,7 +155,7 @@ func (a *App) WithTLSConfig() *App {
 }
 
 func (a *App) WithJWKS() *App {
-	log.Info().Msg("Init Keycloak config")
+	log.Info().Msg("Init JWKS config")
 	jwksURL := a.Cfg.Web.JwksCertURL
 	log.Info().Str("url", jwksURL).Msg("JWKS URL")
 

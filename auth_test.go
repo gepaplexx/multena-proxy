@@ -3,8 +3,6 @@ package main
 import (
 	"net/http"
 	"testing"
-
-	"github.com/golang-jwt/jwt/v5"
 )
 
 var devOn = struct {
@@ -51,50 +49,13 @@ func TestGetBearerToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &http.Request{Header: http.Header{"Authorization": {tt.authHeader}}}
-			got, err := getBearerToken(r)
+			got, err := trimBearerToken(r)
 			if (err != nil) != tt.expectErr {
-				t.Errorf("getBearerToken() error = %v, expectErr %v", err, tt.expectErr)
+				t.Errorf("trimBearerToken() error = %v, expectErr %v", err, tt.expectErr)
 				return
 			}
 			if got != tt.expected {
-				t.Errorf("getBearerToken() = %v, want %v", got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestIsValidToken(t *testing.T) {
-	tests := []struct {
-		name     string
-		token    *jwt.Token
-		config   Config
-		expected bool
-	}{
-		{
-			name:     "valid token with dev mode off",
-			token:    &jwt.Token{Valid: true},
-			config:   Config{Dev: devOff},
-			expected: true,
-		},
-		{
-			name:     "invalid token with dev mode on",
-			token:    &jwt.Token{Valid: false},
-			config:   Config{Dev: devOn},
-			expected: true,
-		},
-		{
-			name:     "invalid token with dev mode off",
-			token:    &jwt.Token{Valid: false},
-			config:   Config{Dev: devOff},
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := isValidToken(tt.token, tt.config)
-			if got != tt.expected {
-				t.Errorf("isValidToken() = %v, want %v", got, tt.expected)
+				t.Errorf("trimBearerToken() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

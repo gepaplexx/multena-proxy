@@ -15,7 +15,7 @@ import (
 
 type Labelstore interface {
 	Connect(App) error
-	GetLabels(token KeycloakToken) (map[string]bool, bool)
+	GetLabels(token OAuthToken) (map[string]bool, bool)
 }
 
 func (a *App) WithLabelStore() *App {
@@ -69,7 +69,7 @@ func (c *ConfigMapHandler) Connect(_ App) error {
 	return nil
 }
 
-func (c *ConfigMapHandler) GetLabels(token KeycloakToken) (map[string]bool, bool) {
+func (c *ConfigMapHandler) GetLabels(token OAuthToken) (map[string]bool, bool) {
 	username := token.PreferredUsername
 	groups := token.Groups
 	mergedNamespaces := make(map[string]bool, len(c.labels[username])*2)
@@ -124,7 +124,7 @@ func (m *MySQLHandler) Close() {
 	}
 }
 
-func (m *MySQLHandler) GetLabels(token KeycloakToken) (map[string]bool, bool) {
+func (m *MySQLHandler) GetLabels(token OAuthToken) (map[string]bool, bool) {
 	tokenMap := map[string]string{
 		"email":             token.Email,
 		"preferredUsername": token.PreferredUsername,

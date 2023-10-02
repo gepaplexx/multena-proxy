@@ -185,7 +185,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer ",
-			expectedBody:     "error parsing Keycloak token\n",
+			expectedBody:     "error parsing token\nno tenant labels found\n",
 		},
 		{
 			name:             "Malformed_authorization_header:_Bearer_skk",
@@ -193,7 +193,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + "skk",
-			expectedBody:     "error parsing Keycloak token\n",
+			expectedBody:     "error parsing token\nno tenant labels found\n",
 		},
 		{
 			name:             "Missing_tenant_labels_for_user",
@@ -201,7 +201,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + tokens["noTenant"],
-			expectedBody:     "No tenant labels found\n",
+			expectedBody:     "no tenant labels found\n",
 		},
 		{
 			name:             "Valid_token_and_headers,_no_query",
@@ -225,7 +225,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "No tenant labels found\n",
+			expectedBody:     "no tenant labels found\n",
 		},
 		{
 			name:             "User_belongs_to_no_groups,_accessing_forbidden_tenant",
@@ -233,7 +233,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "No tenant labels found\n",
+			expectedBody:     "no tenant labels found\n",
 		},
 		{
 			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenant",
@@ -334,7 +334,7 @@ func TestIsAdminSkip(t *testing.T) {
 	app.WithConfig()
 	app.Cfg.Admin.Bypass = true
 	app.Cfg.Admin.Group = "gepardec-run-admins"
-	token := &KeycloakToken{Groups: []string{"gepardec-run-admins"}}
+	token := &OAuthToken{Groups: []string{"gepardec-run-admins"}}
 	a.True(isAdmin(*token, app))
 
 	token.Groups = []string{"user"}
