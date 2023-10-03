@@ -234,62 +234,84 @@ user3:
   opernshift-monitoring: true
 ```
 
-The format consists of a key for username|groupname, followed by another key value pair where the key 
+The format consists of a key for username|groupname, followed by another key value pair where the key
 is the label and value is true.
 This has been done to look up the labels faster.
 
-## To configure the Proxy Multena, follow these steps:
+## How to Configure Multena Proxy
 
-1. Create a YAML file (e.g., `config.yaml`).
+### Step 1: Install/Upgrade Multena Using Helm
 
-2. Copy the sample configuration provided above into the file.
+Multena can be deployed using its Helm chart. Execute the following commands to install or upgrade Multena:
 
-3. Modify the configuration options according to your requirements. Here's an overview of the options you might need to
-   modify:
-    1.
-        - For `provider` set either configmap or mysql depending on your needs.
+To **install**:
 
-        - Set the appropriate values for `log_level`, `thanos_url`, `loki_url`, `jwks_cert_url`, `admin_group`,
-          and `port`
-          based on your environment and preferences.
+```bash
+helm repo add gepardec https://gepaplexx.github.io/gp-helm-charts/
+helm install multena gepardec/gp-multena -n <grafana-namespace>
+```
 
-        - Adjust the values of `tenant_labels.thanos` and `tenant_labels.loki` to match your desired tenant labels.
+To **upgrade**:
 
-        - If you don't need the development mode, set `dev.enabled` to `false`. Otherwise, set `dev.username`
-          and `dev.service_account_token` to appropriate values.
+```bash
+helm repo update
+helm upgrade multena gepardec/gp-multena -n <grafana-namespace>
+```
 
-    2. Database: If you use mysql as a provider update the `db` section with the correct values
-       for `user`, `password_path`, `host`, `port`, `dbName`, and `query` to connect to your database and execute the
-       desired query.
+> **Note**: When using the Grafana operator, the Helm chart provides an option to install `grafana-operator-datasources`
+> to simplify the deployment of Multena. If you deploy it without the `grafana-operator-datasources`, you'll have to
+> configure the datasource manually.
 
-    3. ConfigMap: If you have set the current provider to ConfigMap, you need to configure the labels by using a
-       labels.yaml file with the following format:
-       ```yaml
-       groups:
-          - example_group: [ "example_namespace" ]
-       users:
-          - example_user: [ "example_namespace" ]
-       ````
-       In the labels.yaml file, you define the allowed labels for groups and users. Each group or user is listed along
-       with
-       the corresponding list of allowed namespaces. For example, the example_group is allowed to access the
-       example_namespace, and the example_user is also allowed to access the example_namespace.
+### Step 2: Choose a Labelstore Provider
 
-4. Add Multena as Grafana data source and configure it with the correct values:
-   The Datasource needs one header to be set:
-    - `X-Plugin-Id: <thanos or loki>`
-      to work properly it also needs the forward oauth identify option to be set.
-      The loki option may need the "/api/logs/v1/application/" url suffix to work properly
+Multena offers two types of providers for label lookup - **ConfigMap** and **MySQL**.
 
-By following these steps and customizing the configuration options to your needs, you can effectively configure
-Multena to work with your Grafana, Thanos, Loki, and database setup.
+#### a. ConfigMap Provider
 
-### Service Account Token Authentication
+- Utilizes a separate ConfigMap to define allowed labels for each user/group.
+- Labels can be defined manually, or use [multena-rbac-collector](https://github.com/gepaplexx/multena-rbac-collector)
+  for automatic collection of permissions.
 
-Multena uses its service account token to authenticate with data sources. This is necessary because, in environments
-like OpenShift 4, data sources are typically protected by the OAuth2 proxy. This approach should be taken in
-non-OpenShift 4 environments as well.
+To enable the use of multena-rbac-collector in the Helm chart:
 
-The right role bindings for Multena need to be set. In small OpenShift deployments, the cluster-monitoring-view role
-should be assigned. This role binding is set up by the helm chart during deployment. These steps ensure Multena can
-correctly access the data sources.
+```yaml
+rbac-collector:
+  enabled: true 
+```
+
+#### b. MySQL Provider
+
+- Performs a custom query against a MySQL database to retrieve allowed tenant labels dynamically for a specified
+  user/group.
+- Suitable if you have a systematic way to retrieve permissions for a user via a MySQL database.
+
+> **Note**: Enable caching for the database since every query sends a request to it.
+
+### Step 3: Configure `config.yaml`
+
+Multena's `config.yaml` contains crucial configuration sections such as `proxy`, `datasource`, `logging`, `admin`,
+and `db`.
+
+#### a. Proxy Section
+
+Define configurations like proxy port, host, TLS verification, and OAuth group name here.
+
+#### b. Datasource Section (Thanos/Loki)
+
+Specify either `thanos` or `loki` and define configurations like URL, tenant label, certificate paths, and headers.
+
+#### c. Logging Section
+
+Manage log level and token logging here.
+
+#### d. Admin Section
+
+Configure if and which group can bypass enforcing steps.
+
+#### e. DB Section
+
+Enable and configure database connections, define query parameters, and specify which JWT field will be used to query
+the database.
+
+
+
