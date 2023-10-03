@@ -3,23 +3,9 @@ package main
 import (
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
-
-var devOn = struct {
-	Enabled  bool   `mapstructure:"enabled"`
-	Username string `mapstructure:"username"`
-}(struct {
-	Enabled  bool
-	Username string
-}{Enabled: true, Username: ""})
-
-var devOff = struct {
-	Enabled  bool   `mapstructure:"enabled"`
-	Username string `mapstructure:"username"`
-}(struct {
-	Enabled  bool
-	Username string
-}{Enabled: false, Username: ""})
 
 func TestGetBearerToken(t *testing.T) {
 	tests := []struct {
@@ -56,6 +42,59 @@ func TestGetBearerToken(t *testing.T) {
 			}
 			if got != tt.expected {
 				t.Errorf("trimBearerToken() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTrimBearerToken(t *testing.T) {
+	assert := assert.New(t)
+
+	tests := []struct {
+		name          string
+		headerValue   string
+		expectedToken string
+		expectError   bool
+	}{
+		{
+			name:          "Valid token",
+			headerValue:   "Bearer example_token",
+			expectedToken: "example_token",
+			expectError:   false,
+		},
+		{
+			name:          "No Authorization header",
+			headerValue:   "",
+			expectedToken: "",
+			expectError:   true,
+		},
+		{
+			name:          "No Authorization header",
+			headerValue:   "totally a jwt",
+			expectedToken: "",
+			expectError:   true,
+		},
+		{
+			name:          "Token with space",
+			headerValue:   "Bearer token_with_space ",
+			expectedToken: "token_with_space",
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest("GET", "http://example.com", nil)
+			req.Header.Set("Authorization", tt.headerValue)
+
+			token, err := trimBearerToken(req)
+
+			assert.Equal(tt.expectedToken, token)
+
+			if tt.expectError {
+				assert.Error(err)
+			} else {
+				assert.NoError(err)
 			}
 		})
 	}

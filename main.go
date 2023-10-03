@@ -3,13 +3,14 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"runtime"
+
 	"github.com/MicahParks/keyfunc/v2"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
-	"net/http"
-	"runtime"
 
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
@@ -40,15 +41,12 @@ func main() {
 
 	app := App{}
 	app.WithConfig().
-		logConfig().
 		WithSAT().
 		WithTLSConfig().
 		WithJWKS().
 		WithLabelStore().
-		WithRoutes().
 		WithHealthz().
-		WithThanos().
-		WithLoki().
+		WithRoutes().
 		StartServer()
 
 	log.Info().Any("config", app.Cfg)
@@ -56,6 +54,7 @@ func main() {
 	select {}
 }
 
+// StartServer starts the HTTP server for the proxy and metrics.
 func (a *App) StartServer() {
 	go func() {
 		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", a.Cfg.Web.Host, a.Cfg.Web.MetricsPort), a.i); err != nil {

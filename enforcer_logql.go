@@ -10,8 +10,13 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 )
 
+// LogQLEnforcer manipulates and enforces tenant isolation on LogQL queries.
 type LogQLEnforcer struct{}
 
+// Enforce modifies a LogQL query string to enforce tenant isolation based on provided tenant labels and a label match string.
+// If the input query is empty, a new query is constructed to match provided tenant labels.
+// If the input query is non-empty, it is parsed and modified to ensure tenant isolation.
+// Returns the modified query or an error if parsing or modification fails.
 func (LogQLEnforcer) Enforce(query string, tenantLabels map[string]bool, labelMatch string) (string, error) {
 	log.Trace().Str("function", "enforcer").Str("query", query).Msg("input")
 	if query == "" {
@@ -52,12 +57,10 @@ func (LogQLEnforcer) Enforce(query string, tenantLabels map[string]bool, labelMa
 	return expr.String(), nil
 }
 
-// matchNamespaceMatchers takes a slice of label matchers from a LogQL query and a map where keys
-// are tenant labels and values are booleans. It checks if the tenant label exists in the matchers,
-// and if it does, it verifies that all of its values exist in the tenant labels map. If the tenant
-// label does not exist in the matchers, it adds it to the matchers along with all values from the
-// tenant labels map. If it encounters an unauthorized namespace during the process, it returns an
-// error. If everything goes well, it returns the updated matchers slice and nil error.
+// matchNamespaceMatchers ensures tenant label matchers in a LogQL query adhere to provided tenant labels.
+// It verifies that the tenant label exists in the query matchers, validating or modifying its values based on tenantLabels.
+// If the tenant label is absent in the matchers, it's added along with all values from tenantLabels.
+// Returns an error for an unauthorized namespace and nil on success.
 func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[string]bool, labelMatch string) ([]*labels.Matcher, error) {
 	foundNamespace := false
 	for _, match := range queryMatches {

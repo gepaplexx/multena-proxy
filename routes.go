@@ -18,14 +18,8 @@ type Route struct {
 	MatchWord string
 }
 
-func (a *App) WithRoutes() *App {
-	e := mux.NewRouter()
-	e.Use(a.loggingMiddleware)
-	e.SkipClean(true)
-	a.e = e
-	return a
-}
-
+// WithHealthz sets up and adds health check endpoints (/healthz and /debug/pprof/)
+// and metrics endpoint (/metrics) to a new router
 func (a *App) WithHealthz() *App {
 	i := mux.NewRouter()
 	a.healthy = true
@@ -44,6 +38,20 @@ func (a *App) WithHealthz() *App {
 	return a
 }
 
+// WithRoutes initializes a new router, sets up logging middleware, and assigns
+// the router to the App's router field, returning the updated App.
+func (a *App) WithRoutes() *App {
+	e := mux.NewRouter()
+	e.Use(a.loggingMiddleware)
+	e.SkipClean(true)
+	a.e = e
+	a.WithLoki()
+	a.WithThanos()
+	return a
+}
+
+// WithLoki configures and adds a set of Loki API routes to the App's router,
+// logging warnings if the Loki URL is not set, and returns the updated App.
 func (a *App) WithLoki() *App {
 	if a.Cfg.Loki.URL == "" {
 		log.Warn().Msg("Loki URL not set, skipping Loki routes")
@@ -75,6 +83,8 @@ func (a *App) WithLoki() *App {
 	return a
 }
 
+// WithThanos configures and adds a set of Thanos API routes to the App's router,
+// logging warnings if the Thanos URL is not set, and returns the updated App.
 func (a *App) WithThanos() *App {
 	if a.Cfg.Thanos.URL == "" {
 		log.Warn().Msg("Thanos URL not set, skipping Thanos routes")
@@ -108,6 +118,23 @@ func (a *App) WithThanos() *App {
 	return a
 }
 
+// handler function orchestrates the request flow through the proxy, comprising
+// authentication, conditional enforcement, and forwarding to the upstream server.
+//
+// Initially, it retrieves the OAuth token and validates it.
+//
+// Subsequently, it validates labels retrieved from the token and determines whether
+// enforcement should be skipped based on them. If an error occurs during label
+// validation, it is logged and a forbidden status response is dispatched. If enforcement
+// is opted to be skipped, the request is streamed directly to the upstream server without
+// further checks.
+//
+// If the flow doesn’t skip enforcement, the function enforces the request based on the
+// provided labels and other relevant parameters. Should any enforcement error arise, it is
+// logged and a forbidden status is sent to the client.
+//
+// Finally, if all checks and possible enforcement pass successfully, the request is
+// streamed to the upstream server.
 func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls bool, header map[string]string, a *App) func(http.ResponseWriter, *http.Request) {
 	upstreamURL, err := url.Parse(dsURL)
 	if err != nil {
@@ -116,7 +143,7 @@ func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls 
 	return func(w http.ResponseWriter, r *http.Request) {
 		oauthToken, err := getToken(r, a)
 		if err != nil {
-			logAndWriteError(w, http.StatusForbidden, err, "") //"error parsing OAuth token")
+			logAndWriteError(w, http.StatusForbidden, err, "")
 		}
 
 		labels, skip, err := validateLabels(oauthToken, a)
@@ -126,6 +153,7 @@ func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls 
 		}
 		if skip {
 			streamUp(w, r, upstreamURL, tls, header, a)
+			return
 		}
 
 		err = enforceRequest(r, enforcer, labels, tl, matchWord)
@@ -138,12 +166,16 @@ func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls 
 	}
 }
 
+// streamUp forwards the provided HTTP request to the specified upstream URL using
+// a reverse proxy.It serves the upstream content back to the original client.
 func streamUp(w http.ResponseWriter, r *http.Request, upstreamURL *url.URL, tls bool, header map[string]string, a *App) {
 	setHeader(r, tls, header, a.ServiceAccountToken)
 	proxy := httputil.NewSingleHostReverseProxy(upstreamURL)
 	proxy.ServeHTTP(w, r)
 }
 
+// setHeader modifies the HTTP request headers to set the Authorization and
+// other headers based on the provided arguments.
 func setHeader(r *http.Request, tls bool, header map[string]string, sat string) {
 	if !tls {
 		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sat))

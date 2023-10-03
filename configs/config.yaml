@@ -18,7 +18,7 @@ admin:
   group: gepardec-run-admins
 
 dev:
-  enabled: true
+  enabled: false
   username: example
 
 

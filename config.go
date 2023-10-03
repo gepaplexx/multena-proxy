@@ -3,16 +3,17 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/MicahParks/keyfunc/v2"
-	"github.com/fsnotify/fsnotify"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/MicahParks/keyfunc/v2"
+	"github.com/fsnotify/fsnotify"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -98,6 +99,7 @@ func (a *App) WithConfig() *App {
 	})
 	v.WatchConfig()
 	zerolog.SetGlobalLevel(zerolog.Level(a.Cfg.Log.Level))
+	log.Debug().Any("config", a.Cfg).Msg("")
 	return a
 }
 

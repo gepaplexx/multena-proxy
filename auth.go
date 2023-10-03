@@ -12,6 +12,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// OAuthToken represents the structure of an OAuth token.
+// It holds user-related information extracted from the token.
 type OAuthToken struct {
 	Groups            []string `json:"-"`
 	PreferredUsername string   `json:"preferred_username"`
@@ -19,6 +21,8 @@ type OAuthToken struct {
 	jwt.RegisteredClaims
 }
 
+// getToken retrieves the OAuth token from the incoming HTTP request.
+// It extracts, parses, and validates the token from the Authorization header.
 func getToken(r *http.Request, a *App) (OAuthToken, error) {
 	authToken, err := trimBearerToken(r)
 	if err != nil {
@@ -34,6 +38,8 @@ func getToken(r *http.Request, a *App) (OAuthToken, error) {
 	return oauthToken, nil
 }
 
+// trimBearerToken extracts the token from the Authorization header of the HTTP request.
+// It trims the "Bearer" prefix from the Authorization header and returns the actual token.
 func trimBearerToken(r *http.Request) (string, error) {
 	authToken := r.Header.Get("Authorization")
 	if authToken == "" {
@@ -46,6 +52,8 @@ func trimBearerToken(r *http.Request) (string, error) {
 	return strings.TrimSpace(splitToken[1]), nil
 }
 
+// parseJwtToken parses the JWT token string and constructs an OAuthToken from the parsed claims.
+// It returns the constructed OAuthToken, the parsed jwt.Token, and any error that occurred during parsing.
 func parseJwtToken(tokenString string, a *App) (OAuthToken, *jwt.Token, error) {
 	var oAuthToken OAuthToken
 	var claimsMap jwt.MapClaims
@@ -72,6 +80,10 @@ func parseJwtToken(tokenString string, a *App) (OAuthToken, *jwt.Token, error) {
 	return oAuthToken, token, err
 }
 
+// validateLabels validates the labels in the OAuth token.
+// It checks if the user is an admin and skips label enforcement if true.
+// Returns a map representing valid labels, a boolean indicating whether label enforcement should be skipped,
+// and any error that occurred during validation.
 func validateLabels(token OAuthToken, a *App) (map[string]bool, bool, error) {
 	if isAdmin(token, a) {
 		log.Debug().Str("user", token.PreferredUsername).Bool("Admin", true).Msg("Skipping label enforcement")

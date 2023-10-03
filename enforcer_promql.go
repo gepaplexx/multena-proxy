@@ -11,8 +11,12 @@ import (
 	"github.com/prometheus/prometheus/promql/parser"
 )
 
+// PromQLEnforcer is a struct with methods to enforce specific rules on Prometheus Query Language (PromQL) queries.
 type PromQLEnforcer struct{}
 
+// Enforce enhances a given PromQL query string with additional label matchers,
+// ensuring that the query complies with the allowed tenant labels and specified label match.
+// It returns the enhanced query or an error if the query cannot be parsed or is not compliant.
 func (PromQLEnforcer) Enforce(query string, allowedTenantLabels map[string]bool, labelMatch string) (string, error) {
 	log.Trace().Str("function", "enforcer").Str("query", query).Msg("input")
 	if query == "" {
@@ -51,9 +55,9 @@ func (PromQLEnforcer) Enforce(query string, allowedTenantLabels map[string]bool,
 	return expr.String(), nil
 }
 
-// extractLabelsAndValues takes a PromQL expression and traverses the expression tree to extract
-// all labels and their corresponding values. It returns a map where keys are labels and values
-// are their corresponding values. If an error occurs during the process, it returns an error.
+// extractLabelsAndValues parses a PromQL expression and extracts labels and their values.
+// It returns a map where keys are label names and values are corresponding label values.
+// An error is returned if the expression cannot be parsed.
 func extractLabelsAndValues(expr parser.Expr) (map[string]string, error) {
 	l := make(map[string]string)
 	parser.Inspect(expr, func(node parser.Node, path []parser.Node) error {
@@ -67,11 +71,9 @@ func extractLabelsAndValues(expr parser.Expr) (map[string]string, error) {
 	return l, nil
 }
 
-// enforceLabels takes a map where keys are labels from a query and their values, and a map where keys
-// are allowed tenant labels and values are booleans. It checks if the tenant label exists in the
-// query labels. If it does, it verifies that all of its values exist in the allowed tenant labels map.
-// If the tenant label does not exist in the query labels, it returns all values from the allowed tenant
-// labels map. If it encounters a tenant that is not allowed during the process, it returns an error.
+// enforceLabels checks if provided query labels comply with allowed tenant labels and a specified label match.
+// If the labels comply, it returns them (or all allowed tenant labels if not specified in the query) and nil.
+// If not, it returns an error indicating the non-compliant label.
 func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool, labelMatch string) ([]string, error) {
 	if _, ok := queryLabels[labelMatch]; ok {
 		ok, tenantLabels := checkLabels(queryLabels, allowedTenantLabels, labelMatch)
@@ -84,8 +86,8 @@ func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string
 	return MapKeysToArray(allowedTenantLabels), nil
 }
 
-// checkLabels checks if all query labels are within the allowed tenant labels.
-// Returns a boolean indicating success, and the checked labels.
+// checkLabels validates if query labels are present in the allowed tenant labels and returns them.
+// If a query label is not allowed, it returns false and the non-compliant label.
 func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]bool, labelMatch string) (bool, []string) {
 	splitQueryLabels := strings.Split(queryLabels[labelMatch], "|")
 	for _, queryLabel := range splitQueryLabels {
@@ -97,7 +99,6 @@ func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]b
 	return true, splitQueryLabels
 }
 
-// createEnforcer creates and returns a label enforcer with a matcher containing tenant labels.
 func createEnforcer(tenantLabels []string, labelMatch string) *enforcer.Enforcer {
 	var matchType labels.MatchType
 	if len(tenantLabels) > 1 {

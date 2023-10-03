@@ -293,9 +293,7 @@ func Test_reverseProxy(t *testing.T) {
 		},
 	}
 
-	app.WithRoutes().
-		WithLoki().
-		WithThanos()
+	app.WithRoutes()
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

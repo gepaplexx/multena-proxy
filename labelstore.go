@@ -13,11 +13,21 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Labelstore represents an interface defining methods for connecting to a
+// label store and retrieving labels associated with a given OAuth token.
 type Labelstore interface {
+	// Connect establishes a connection with the label store using App configuration.
 	Connect(App) error
+	// GetLabels retrieves labels associated with the provided OAuth token.
+	// Returns a map containing the labels and a boolean indicating whether
+	// the label is cluster-wide or not.
 	GetLabels(token OAuthToken) (map[string]bool, bool)
 }
 
+// WithLabelStore initializes and connects to a LabelStore specified in the
+// application configuration. It assigns the connected LabelStore to the App
+// instance and returns it. If the LabelStore type is unknown or an error
+// occurs during the connection, it logs a fatal error.
 func (a *App) WithLabelStore() *App {
 	switch a.Cfg.Web.LabelStoreKind {
 	case "configmap":
