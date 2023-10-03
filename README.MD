@@ -125,7 +125,7 @@ helm upgrade multena gepardec/gp-multena -n <grafana-namespace>
 
 > **_NOTE:_** Currently Multena offers two different providers for label lookup, namely ConfigMap and MySQL.
 
-### ConfigMap
+### ConfigMap Provider
 
 With the ConfigMap provider, Multena can retrieve labels by reading a separate ConfigMap that defines a list of
 allowed labels for each user or group. This approach allows for easy configuration and management of label permissions
@@ -146,7 +146,7 @@ rbac-collector:
 
 in the helm chart.
 
-### MySQL
+### MySQL Provider
 
 The MySQL provider enables label lookup through executing a custom
 query against a MySQL database. This capability allows Multena to dynamically fetch the allowed tenant lalbel (e.g.,
