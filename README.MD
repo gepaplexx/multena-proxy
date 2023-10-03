@@ -11,15 +11,15 @@ Making the LGTM-Stack **mul**ti **tena**ncy ready
 ---
 **Multena Proxy** is a multi-tenancy ready tool designed to enhance the authorization capabilities of your LGTM (Loki
 Grafana Tempo Mimir(Prometheus Style API / OpenMetrics)) stack. Built with LBAC (Label Based Access Control) at its
-core, Multena provides
-secure
-and granular user authorization based on assigned tenant labels. It integrates seamlessly with PrometheusAPI and Loki,
-and
-supports Keycloak for identity management. With features like ConfigMap-based configuration, flexible authorization
-providers, and multiple tenant labels, Multena ensures that the right data is accessible to the right users.
+core.
+
+Multena provides secure and granular user authorization based on assigned tenant labels. 
+It integrates seamlessly with PrometheusAPI and Loki, and
+should support generic oauth provider for identity management. With features like ConfigMap-based configuration, 
+flexible authorization providers, and multiple tenant labels, Multena ensures that the right data is accessible to the right users.
 
 ---
-> __NOTE:__ Multena was specifically developed to support OpenShift 4's internal Prometheus, which is powered by Thanos.
+> __NOTE:__ Multena was initially developed to support OpenShift 4's internal Prometheus, which is powered by Thanos.
 > As a result, many references in Multena are made to Thanos, which serves as an API following the Prometheus style.
 
 ## How does it work?
