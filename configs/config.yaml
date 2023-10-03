@@ -30,6 +30,7 @@ db:
   port: 3306
   dbName: example
   query: "SELECT * FROM users WHERE username = ?"
+  token_key: "email"
 
 thanos:
   url: https://localhost:9091

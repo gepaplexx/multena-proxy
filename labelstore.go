@@ -136,9 +136,9 @@ func (m *MySQLHandler) Close() {
 
 func (m *MySQLHandler) GetLabels(token OAuthToken) (map[string]bool, bool) {
 	tokenMap := map[string]string{
-		"email":             token.Email,
-		"preferredUsername": token.PreferredUsername,
-		"groups":            strings.Join(token.Groups, ","),
+		"email":    token.Email,
+		"username": token.PreferredUsername,
+		"groups":   strings.Join(token.Groups, ","),
 	}
 
 	value, ok := tokenMap[m.TokenKey]
