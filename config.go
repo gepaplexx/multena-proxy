@@ -117,14 +117,15 @@ func (a *App) WithSAT() *App {
 }
 
 func (a *App) WithTLSConfig() *App {
-	err := os.Setenv("SSL_CERT_FILE", "/etc/ssl/ca/ca-certificates.crt")
+	caCert, err := os.ReadFile("/etc/ssl/ca/ca-certificates.crt")
 	if err != nil {
-		log.Error().Err(err).Msg("Error while setting SSL_CERT_FILE")
-		return nil
+		log.Fatal().Err(err).Msg("Error while reading CA certificate")
 	}
-	rootCAs, _ := x509.SystemCertPool()
-	if rootCAs == nil {
-		rootCAs = x509.NewCertPool()
+	log.Trace().Bytes("caCert", caCert).Msg("")
+
+	rootCAs := x509.NewCertPool()
+	if ok := rootCAs.AppendCertsFromPEM(caCert); !ok {
+		log.Fatal().Msg("Failed to append CA certificate")
 	}
 	log.Debug().Any("rootCAs", rootCAs).Msg("")
 
