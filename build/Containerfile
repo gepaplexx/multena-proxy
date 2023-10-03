@@ -4,7 +4,7 @@ FROM alpine:latest AS certs
 RUN apk --no-cache add ca-certificates
 
 FROM scratch
-COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/secrets/ca/
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/secrets/ca/ca-certificates.crt
 COPY multena-proxy /usr/local/bin/multena-proxy
 USER nonroot:nonroot
 ENTRYPOINT ["multena-proxy"]
