@@ -117,6 +117,10 @@ func (a *App) WithSAT() *App {
 }
 
 func (a *App) WithTLSConfig() *App {
+	err := os.Setenv("SSL_CERT_FILE", "/var/run/ca/ca-certificates.crt")
+	if err != nil {
+		return nil
+	}
 	rootCAs, _ := x509.SystemCertPool()
 	if rootCAs == nil {
 		rootCAs = x509.NewCertPool()
