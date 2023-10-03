@@ -117,7 +117,7 @@ func (a *App) WithSAT() *App {
 }
 
 func (a *App) WithTLSConfig() *App {
-	err := os.Setenv("SSL_CERT_FILE", "/var/run/ca/ca-certificates.crt")
+	err := os.Setenv("SSL_CERT_FILE", "/etc/ssl/ca/ca-certificates.crt")
 	if err != nil {
 		log.Error().Err(err).Msg("Error while setting SSL_CERT_FILE")
 		return nil
