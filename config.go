@@ -26,7 +26,7 @@ type Config struct {
 		ProxyPort           int    `mapstructure:"proxy_port"`
 		MetricsPort         int    `mapstructure:"metrics_port"`
 		Host                string `mapstructure:"host"`
-		InsecureSkipVerify  bool   `mapstructure:"insecure_skip_verify"`
+		TLSVerifySkip       bool   `mapstructure:"tls_verify_skip"`
 		TrustedRootCaPath   string `mapstructure:"trusted_root_ca_path"`
 		LabelStoreKind      string `mapstructure:"label_store_kind"`
 		JwksCertURL         string `mapstructure:"jwks_cert_url"`
@@ -166,7 +166,7 @@ func (a *App) WithTLSConfig() *App {
 	}
 
 	config := &tls.Config{
-		InsecureSkipVerify: a.Cfg.Web.InsecureSkipVerify,
+		InsecureSkipVerify: a.Cfg.Web.TLSVerifySkip,
 		RootCAs:            rootCAs,
 		Certificates:       certificates,
 	}

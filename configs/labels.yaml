@@ -1,4 +1,8 @@
 group1:
-  '#cluster-wide': true
+  '#cluster-wide': true # this grants the group to skip enforcement
 user1:
-  hogarama: true
+  hogarama: true # single namespace
+user3:
+  grafana: true # multi namespace
+  opernshift-logging: true
+  opernshift-monitoring: true

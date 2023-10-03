@@ -6,7 +6,7 @@ web:
   proxy_port: 8080
   metrics_port: 8081
   host: localhost
-  insecure_skip_verify: true
+  tls_verify_skip: true
   trusted_root_ca_path: "./certs/"
   label_store_kind: "configmap"
   jwks_cert_url: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
@@ -20,7 +20,6 @@ admin:
 dev:
   enabled: false
   username: example
-
 
 db:
   enabled: false
