@@ -119,12 +119,14 @@ func (a *App) WithSAT() *App {
 func (a *App) WithTLSConfig() *App {
 	err := os.Setenv("SSL_CERT_FILE", "/var/run/ca/ca-certificates.crt")
 	if err != nil {
+		log.Error().Err(err).Msg("Error while setting SSL_CERT_FILE")
 		return nil
 	}
 	rootCAs, _ := x509.SystemCertPool()
 	if rootCAs == nil {
 		rootCAs = x509.NewCertPool()
 	}
+	log.Debug().Any("rootCAs", rootCAs).Msg("")
 
 	if a.Cfg.Web.TrustedRootCaPath != "" {
 		err := filepath.Walk(a.Cfg.Web.TrustedRootCaPath, func(path string, info os.FileInfo, err error) error {
