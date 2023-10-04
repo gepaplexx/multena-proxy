@@ -1,8 +1,5 @@
 # Use Alpine for CA certificates
 FROM alpine:latest AS certs
-# Ensure latest certificates
-RUN apk --no-cache add ca-certificates
-
 
 FROM scratch
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/ca/ca-certificates.crt
