@@ -5,7 +5,7 @@ RUN go mod verify
 COPY . .
 RUN go build .
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2-750
 RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
 WORKDIR /app/
 COPY --from=go-builder /app/multena-proxy/multena-proxy .
