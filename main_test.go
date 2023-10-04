@@ -8,11 +8,14 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/rs/zerolog/log"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/stretchr/testify/assert"
 )
 
 func genJWKS(username, email string, groups []string, pk *ecdsa.PrivateKey) (string, error) {
@@ -25,19 +28,19 @@ func genJWKS(username, email string, groups []string, pk *ecdsa.PrivateKey) (str
 	return token.SignedString(pk)
 }
 
-func setupTestMain() map[string]string {
+func setupTestMain() (App, map[string]string) {
 	// Generate a new private key.
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		fmt.Printf("Failed to generate private key: %s\n", err)
-		return nil
+		return App{}, nil
 	}
 
 	// Encode the private key to PEM format.
 	privateKeyBytes, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
 		fmt.Printf("Failed to marshal private key: %s\n", err)
-		return nil
+		return App{}, nil
 	}
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "EC PRIVATE KEY",
@@ -48,7 +51,7 @@ func setupTestMain() map[string]string {
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
 		fmt.Printf("Failed to marshal public key: %s\n", err)
-		return nil
+		return App{}, nil
 	}
 	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "PUBLIC KEY",
@@ -93,7 +96,7 @@ func setupTestMain() map[string]string {
 			name:     "noGroupsTenant",
 			Username: "test-user",
 			Email:    "test-email",
-			Groups:   []string{"not-group1", "not-group2"},
+			Groups:   []string{},
 		},
 		{
 			name:     "userAndGroupTenant",
@@ -119,9 +122,11 @@ func setupTestMain() map[string]string {
 			return
 		}
 	}))
-	//defer jwksServer.Close()
-	Cfg.Web.JwksCertURL = jwksServer.URL
-	initJWKS()
+	app := App{}
+	app.WithConfig()
+	// defer jwksServer.Close()
+	app.Cfg.Web.JwksCertURL = jwksServer.URL
+	app.WithJWKS()
 
 	// Set up the upstream server
 	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -130,145 +135,165 @@ func setupTestMain() map[string]string {
 			return
 		}
 	}))
-	//defer upstreamServer.Close()
-	Cfg.Thanos.URL = upstreamServer.URL
-	Cfg.Loki.URL = upstreamServer.URL
-	Cfg.Thanos.TenantLabel = "tenant_id"
-	Cfg.Loki.TenantLabel = "tenant_id"
+	// defer upstreamServer.Close()
+	app.Cfg.Thanos.URL = upstreamServer.URL
+	app.Cfg.Loki.URL = upstreamServer.URL
+	app.Cfg.Thanos.TenantLabel = "tenant_id"
+	app.Cfg.Loki.TenantLabel = "tenant_id"
 
-	Cfg.Users["user"] = []string{"allowed_user", "also_allowed_user"}
-	Cfg.Groups["group1"] = []string{"allowed_group1", "also_allowed_group1"}
-	Cfg.Groups["group2"] = []string{"allowed_group2", "also_allowed_group2"}
-	return tokens
+	cmh := ConfigMapHandler{
+		labels: map[string]map[string]bool{
+			"user":   {"allowed_user": true, "also_allowed_user": true},
+			"group1": {"allowed_group1": true, "also_allowed_group1": true},
+			"group2": {"allowed_group2": true, "also_allowed_group2": true},
+		},
+	}
+
+	app.LabelStore = &cmh
+	return app, tokens
 }
 
 func Test_reverseProxy(t *testing.T) {
-	tokens := setupTestMain()
+	app, tokens := setupTestMain()
+	log.Level(2)
 
 	cases := []struct {
 		name             string
 		setAuthorization bool
 		authorization    string
-		setPluginID      bool
-		pluginID         string
 		expectedStatus   int
 		expectedBody     string
 		URL              string
 	}{
 		{
-			name:           "Missing headers",
+			name:           "Missing_headers",
+			URL:            "/api/v1/query_range",
 			expectedStatus: http.StatusForbidden,
-			expectedBody:   "No Authorization header found\n",
+			expectedBody:   "no Authorization header found\n",
 		},
 		{
-			name:             "Malformed authorization header: B ",
+			name:             "Malformed_authorization_header:_B",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
+			URL:              "/api/v1/query_range",
 			authorization:    "B",
-			expectedBody:     "No Authorization header found\n",
+			expectedBody:     "invalid Authorization header\n",
 		},
 		{
-			name:             "Malformed authorization header: Bearer ",
+			name:             "Malformed_authorization_header:_Bearer",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
+			URL:              "/api/v1/query_range",
 			authorization:    "Bearer ",
-			expectedBody:     "No Authorization header found\n",
+			expectedBody:     "error parsing token\nno tenant labels found\n",
 		},
 		{
-			name:             "Malformed authorization header: Bearer skk",
+			name:             "Malformed_authorization_header:_Bearer_skk",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
+			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + "skk",
-			expectedBody:     "Error parsing Keycloak token\n",
+			expectedBody:     "error parsing token\nno tenant labels found\n",
 		},
 		{
-			name:             "Missing tenant labels for user",
+			name:             "Missing_tenant_labels_for_user",
 			expectedStatus:   http.StatusForbidden,
 			setAuthorization: true,
-			setPluginID:      true,
+			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + tokens["noTenant"],
-			expectedBody:     "No tenant labels found\n",
+			expectedBody:     "no tenant labels found\n",
 		},
 		{
-			name:             "Valid token and headers, no query",
+			name:             "Valid_token_and_headers,_no_query",
 			authorization:    "Bearer " + tokens["userTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
+			URL:              "/api/v1/query_range",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing forbidden tenant",
+			name:             "User_belongs_to_multiple_groups,_accessing_forbidden_tenant",
 			authorization:    "Bearer " + tokens["groupTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
-			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
+			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
 			expectedBody:     "user not allowed with namespace forbidden_tenant\n",
 		},
 		{
-			name:             "User belongs to no groups, accessing forbidden tenant",
+			name:             "Not_a_User,_accessing_forbidden_tenant",
 			authorization:    "Bearer " + tokens["noTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
-			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
+			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "No tenant labels found\n",
+			expectedBody:     "no tenant labels found\n",
 		},
 		{
-			name:             "User belongs to no groups, accessing forbidden tenant",
+			name:             "User_belongs_to_no_groups,_accessing_forbidden_tenant",
 			authorization:    "Bearer " + tokens["noGroupsTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "No tenant labels found\n",
+			expectedBody:     "no tenant labels found\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing allowed tenant",
+			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenant",
 			authorization:    "Bearer " + tokens["groupTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"allowed_group1\"}",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing allowed tenants",
+			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenants",
 			authorization:    "Bearer " + tokens["groupsTenant"],
-			pluginID:         "thanos",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query?query=up{tenant_id=~\"allowed_group1|also_allowed_group2\"}",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing allowed tenant",
+			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenant",
 			authorization:    "Bearer " + tokens["groupsTenant"],
-			pluginID:         "loki",
 			setAuthorization: true,
-			setPluginID:      true,
-			URL:              "/api/v1/query?query={tenant_id=\"also_allowed_group1\"} != 1337",
+			URL:              "/api/v1/query_range?query={tenant_id=\"also_allowed_group1\"} != 1337",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
 		},
 		{
-			name:             "User belongs to multiple groups, accessing allowed tenants",
+			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenants",
 			authorization:    "Bearer " + tokens["groupsTenant"],
-			pluginID:         "loki",
 			setAuthorization: true,
-			setPluginID:      true,
 			URL:              "/api/v1/query?query={tenant_id=~\"allowed_group1|allowed_group2\"} != 1337",
 			expectedStatus:   http.StatusOK,
 			expectedBody:     "Upstream server response\n",
 		},
+		{
+			name:             "Loki_query_range,_accessing_allowed_tenant",
+			authorization:    "Bearer " + tokens["groupsTenant"],
+			setAuthorization: true,
+			URL:              "/loki/api/v1/query_range?direction=backward&end=1690463973787000000&limit=1000&query=sum by (level) (count_over_time({tenant_id=\"allowed_group1\"} |= `path` |= `label` | json | line_format `{{.message}}` | json | line_format `{{.request}}` | json | line_format `{{.method | printf \"%-4s\"}} {{.path | printf \"%-60s\"}} {{.url | urldecode}}`[1m]))&start=1690377573787000000&step=60000ms",
+			expectedStatus:   http.StatusOK,
+			expectedBody:     "Upstream server response\n",
+		},
+		{
+			name:             "Loki_index_stats,_accessing_allowed_tenant",
+			authorization:    "Bearer " + tokens["userTenant"],
+			setAuthorization: true,
+			URL:              "/loki/api/v1/index/stats?query={tenant_id=\"allowed_user\"}&start=1690377573724000000&end=1690463973724000000",
+			expectedStatus:   http.StatusOK,
+			expectedBody:     "Upstream server response\n",
+		},
+		{
+			name:             "Loki_query_range_with_forbidden_tenant",
+			authorization:    "Bearer " + tokens["userTenant"],
+			setAuthorization: true,
+			URL:              "/loki/api/v1/query_range?direction=backward&end=1690463973693000000&limit=10&query={tenant_id=\"forbidden_tenant\"} |= `path` |= `label` | json | line_format `{{.message}}` | json | line_format `{{.request}}` | json | line_format `{{.method}} {{.path}} {{.url | urldecode}}`&start=1690377573693000000&step=86400000ms",
+			expectedStatus:   http.StatusForbidden,
+			expectedBody:     "unauthorized namespace forbidden_tenant\n",
+		},
 	}
+
+	app.WithRoutes()
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -281,15 +306,13 @@ func Test_reverseProxy(t *testing.T) {
 			if tc.setAuthorization {
 				req.Header.Add("Authorization", tc.authorization)
 			}
-			if tc.setPluginID {
-				req.Header.Add("X-Plugin-Id", "thanos")
-			}
 
 			// Prepare the response recorder
 			rr := httptest.NewRecorder()
 
+			log.Debug().Str("URL", tc.URL).Str("Authorization", tc.authorization).Msg("Request")
 			// Call the function
-			reverseProxy(rr, req)
+			app.e.ServeHTTP(rr, req)
 
 			// Check the status code
 			assert.Equal(t, tc.expectedStatus, rr.Code)
@@ -302,40 +325,25 @@ func Test_reverseProxy(t *testing.T) {
 	}
 }
 
-func TestHasAuthorizationHeader(t *testing.T) {
-	assert := assert.New(t)
-
-	req, _ := http.NewRequest("GET", "http://example.com", nil)
-	assert.False(hasAuthorizationHeader(req))
-
-	req.Header.Set("Authorization", "Bearer abc123")
-	assert.True(hasAuthorizationHeader(req))
-}
-
-func TestGetBearerToken(t *testing.T) {
-	assert := assert.New(t)
-
-	req, _ := http.NewRequest("GET", "http://example.com", nil)
-	req.Header.Set("Authorization", "Bearer abc123")
-	assert.Equal("abc123", getBearerToken(req))
-}
-
 func TestIsAdminSkip(t *testing.T) {
-	assert := assert.New(t)
+	a := assert.New(t)
 
-	token := &KeycloakToken{Groups: []string{"gepardec-run-admins"}, ApaGroupsOrg: []string{"gepardec-run-admins"}}
-	assert.True(isAdminSkip(*token))
+	app := &App{}
+	app.WithConfig()
+	app.Cfg.Admin.Bypass = true
+	app.Cfg.Admin.Group = "gepardec-run-admins"
+	token := &OAuthToken{Groups: []string{"gepardec-run-admins"}}
+	a.True(isAdmin(*token, app))
 
 	token.Groups = []string{"user"}
-	token.ApaGroupsOrg = []string{"org"}
-	assert.False(isAdminSkip(*token))
+	a.False(isAdmin(*token, app))
 }
 
 func TestLogAndWriteError(t *testing.T) {
-	assert := assert.New(t)
+	a := assert.New(t)
 
 	rw := httptest.NewRecorder()
-	logAndWriteErrorMsg(rw, "test error", http.StatusInternalServerError, nil)
-	assert.Equal(http.StatusInternalServerError, rw.Code)
-	assert.Equal("test error\n", rw.Body.String())
+	logAndWriteError(rw, http.StatusInternalServerError, nil, "test error")
+	a.Equal(http.StatusInternalServerError, rw.Code)
+	a.Equal("test error\n", rw.Body.String())
 }

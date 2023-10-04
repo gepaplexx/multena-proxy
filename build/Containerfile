@@ -1,10 +1,8 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2
-RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
-WORKDIR /app/
-COPY multena-proxy .
-RUN chgrp -R 0 /app && chmod -R g=u /app
+# Use Alpine for CA certificates
+FROM alpine:latest AS certs
 
-USER 1001
-EXPOSE 8080
-HEALTHCHECK --timeout=10s CMD curl --fail http://localhost:8080/healthz || exit 1
-ENTRYPOINT [ "/app/multena-proxy" ]
+FROM scratch
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/ca/ca-certificates.crt
+COPY multena-proxy /usr/local/bin/multena-proxy
+USER nonroot:nonroot
+ENTRYPOINT ["multena-proxy"]

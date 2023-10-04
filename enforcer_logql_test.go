@@ -1,9 +1,10 @@
 package main
 
 import (
+	"testing"
+
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestLogqlEnforcer(t *testing.T) {
@@ -25,7 +26,7 @@ func TestLogqlEnforcer(t *testing.T) {
 			name:           "Empty query and valid tenant labels",
 			query:          "",
 			tenantLabels:   map[string]bool{"test": true},
-			expectedResult: "{__name__=~\".+\", kubernetes_namespace_name=\"test\"}",
+			expectedResult: "{kubernetes_namespace_name=\"test\"}",
 			expectErr:      false,
 		},
 		{
@@ -36,9 +37,11 @@ func TestLogqlEnforcer(t *testing.T) {
 		},
 	}
 
+	enforcer := LogQLEnforcer{}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := logqlEnforcer(tt.query, tt.tenantLabels)
+			result, err := enforcer.Enforce(tt.query, tt.tenantLabels, "kubernetes_namespace_name")
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -84,7 +87,7 @@ func TestMatchNamespaceMatchers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := matchNamespaceMatchers(tt.matchers, tt.tenantLabels)
+			_, err := matchNamespaceMatchers(tt.matchers, tt.tenantLabels, "kubernetes_namespace_name")
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {

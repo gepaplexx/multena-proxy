@@ -1,43 +1,48 @@
 log:
-  level: DEBUG
-  log_tokens: false
-
-tenant_provider: configmap
+  level: 1 # 0 - debug, 1 - info, 2 - warn, 3 - error, -1 trace (exposes sensitive data)
+  log_tokens: false # log tokens in debug mode
 
 web:
-  proxy_port: 8080
-  metrics_port: 8081
-  host: localhost
-  insecure_skip_verify: true
-  trusted_root_ca_path: "./certs/"
-  jwks_cert_url: https://example.com/realms/internal/protocol/openid-connect/certs
+  proxy_port: 8080 # port to listen on
+  metrics_port: 8081 # metrics port to listen on
+  host: localhost # host to listen on
+  tls_verify_skip: true # skip tls verification very insecurely!!!
+  trusted_root_ca_path: "./certs/" # path to trusted root ca
+  label_store_kind: "configmap" # label provider either configmap or mysql
+  jwks_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs # url to jwks cert of oauth provider
+  oauth_group_name: "groups" # name of the group field in the jwt
 
 admin:
-  bypass: true
-  group: gepardec-run-admins
+  bypass: true # enable admin bypass
+  group: gepardec-run-admins # group name for admin bypass
 
 dev:
-  enabled: false
-  username: example
-  service_account_token: "fake"
+  enabled: false # enable dev mode, but dont use in production
+  username: example # username for dev mode
 
 db:
-  enabled: false
-  user: multitenant
-  password_path: "."
-  host: localhost
-  port: 3306
-  dbName: example
-  query: "SELECT * FROM users WHERE username = ?"
+  enabled: false # enable mysql label provider
+  user: multitenant # user for mysql
+  password_path: "." # path to the password file
+  host: localhost # host of the db
+  port: 3306 # port of the db
+  dbName: example # name of the db
+  query: "SELECT * FROM users WHERE username = ?" # sql query to execute, must return a list of allowed labels
+  token_key: "email" # field in the jwt to use in the sql query
 
 thanos:
-  url: https://localhost:9091
-  tenant_label: namespace
-  cert: "./certs/thanos/tls.crt"
-  key: "./certs/thanos/tls.key"
+  url: https://localhost:9091 # url to thanos querier
+  tenant_label: namespace # label to use for tenant
+  cert: "./certs/thanos/tls.crt" # path to thanos mtls cert
+  key: "./certs/thanos/tls.key" # path to thanos mtls key
+  Header:
+    "example": "application" # header to use
+    "compresion": "gzip" # header to use
 
 loki:
-  url: https://localhost:3100
-  tenant_label: kubernetes_namespace_name
-  cert: "./certs/loki/tls.crt"
-  key: "./certs/loki/tls.key"
+  url: https://localhost:3100 # url to loki querier
+  tenant_label: kubernetes_namespace_name # label to use for tenant
+  cert: "./certs/loki/tls.crt" # path to loki mtls cert
+  key: "./certs/loki/tls.key" # path to loki mtls key
+  Header:
+    "X-Scope-OrgID": "application" # header to use for loki tenant

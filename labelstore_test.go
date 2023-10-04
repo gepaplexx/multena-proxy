@@ -6,35 +6,35 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Setting up the Config
-func setupTestLabeler() {
-	Cfg.Users["user1"] = []string{"tenant1", "tenant2"}
-	Cfg.Users["user2"] = []string{"tenant3", "tenant4"}
-	Cfg.Groups["group1"] = []string{"tenant1", "tenant3"}
-	Cfg.Groups["group2"] = []string{"tenant2", "tenant4"}
-}
-
-// Resetting the Config
-
 func TestGetLabelsCM(t *testing.T) {
-	setupTestLabeler()
-	defer teardown()
+	cmh := ConfigMapHandler{
+		labels: map[string]map[string]bool{
+			"user1":      {"u1": true, "u2": true},
+			"user2":      {"u3": true, "u4": true},
+			"group1":     {"g1": true, "g2": true},
+			"group2":     {"g3": true, "g4": true},
+			"adminGroup": {"#cluster-wide": true, "g4": true},
+		},
+	}
 
 	cases := []struct {
 		name     string
 		username string
 		groups   []string
 		expected map[string]bool
+		skip     bool
 	}{
 		{
 			name:     "User with groups",
 			username: "user1",
 			groups:   []string{"group1", "group2"},
 			expected: map[string]bool{
-				"tenant1": true,
-				"tenant2": true,
-				"tenant3": true,
-				"tenant4": true,
+				"u1": true,
+				"u2": true,
+				"g1": true,
+				"g2": true,
+				"g3": true,
+				"g4": true,
 			},
 		},
 		{
@@ -42,8 +42,8 @@ func TestGetLabelsCM(t *testing.T) {
 			username: "user2",
 			groups:   []string{},
 			expected: map[string]bool{
-				"tenant3": true,
-				"tenant4": true,
+				"u3": true,
+				"u4": true,
 			},
 		},
 		{
@@ -51,8 +51,8 @@ func TestGetLabelsCM(t *testing.T) {
 			username: "user3",
 			groups:   []string{"group1"},
 			expected: map[string]bool{
-				"tenant1": true,
-				"tenant3": true,
+				"g1": true,
+				"g2": true,
 			},
 		},
 		{
@@ -60,16 +60,24 @@ func TestGetLabelsCM(t *testing.T) {
 			username: "user1",
 			groups:   []string{"group3"},
 			expected: map[string]bool{
-				"tenant1": true,
-				"tenant2": true,
+				"u1": true,
+				"u2": true,
 			},
+		},
+		{
+			name:     "admin_group",
+			username: "blubb",
+			groups:   []string{"adminGroup"},
+			expected: nil,
+			skip:     true,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			labels := GetLabelsCM(tc.username, tc.groups)
+			labels, skip := cmh.GetLabels(OAuthToken{PreferredUsername: tc.username, Groups: tc.groups})
 			assert.Equal(t, tc.expected, labels)
+			assert.Equal(t, tc.skip, skip)
 		})
 	}
 }

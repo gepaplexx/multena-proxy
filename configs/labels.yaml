@@ -1,4 +1,8 @@
-groups:
-  - example_group: ["example_namespace"]
-users:
-  - example_user: [ "example_namespace" ]
+group1:
+  '#cluster-wide': true # this grants the group to skip enforcement
+user1:
+  hogarama: true # single namespace
+user3:
+  grafana: true # multi namespace
+  opernshift-logging: true
+  opernshift-monitoring: true
