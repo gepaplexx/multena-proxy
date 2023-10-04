@@ -199,3 +199,4 @@ jobs:
           DRY_RUN: false
           DEFAULT_BUMP: patch
           RELEASE_BRANCHES: main
+
