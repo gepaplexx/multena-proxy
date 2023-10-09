@@ -1,17 +1,16 @@
-FROM registry.access.redhat.com/ubi9/go-toolset:1.19.9-7 as go-builder
+FROM golang:alpine3.18 as go-builder
 WORKDIR /app/multena-proxy
 COPY go.mod go.sum ./
-RUN go mod verify
+RUN go mod tidy
 COPY . .
 RUN go build .
-
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2
-RUN microdnf update -y && microdnf install -y ca-certificates && microdnf clean all
-WORKDIR /app/
-COPY --from=go-builder /app/multena-proxy/multena-proxy .
 RUN chgrp -R 0 /app && chmod -R g=u /app
 
-USER 1001
-EXPOSE 8080
+FROM scratch
+WORKDIR /app/
+COPY --from=go-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/ca/ca-certificates.crt
+COPY --from=go-builder /app/multena-proxy/multena-proxy .
+
 HEALTHCHECK --timeout=10s CMD curl --fail http://localhost:8080/healthz || exit 1
-ENTRYPOINT [ "/app/multena-proxy" ]
+USER nonroot:nonroot
+ENTRYPOINT ["multena-proxy"]
