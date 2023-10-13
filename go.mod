@@ -11,7 +11,7 @@ require (
 	github.com/observatorium/api v0.1.3-0.20231013122120-c7a88d3caf8e
 	github.com/prometheus-community/prom-label-proxy v0.7.0
 	github.com/prometheus/client_golang v1.17.0
-	github.com/prometheus/prometheus v0.47.1
+	github.com/prometheus/prometheus v0.47.2
 	github.com/rs/zerolog v1.31.0
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/spf13/viper v1.17.0
@@ -82,6 +82,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.47.1
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.47.2
 
 replace golang.org/x/exp => golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
