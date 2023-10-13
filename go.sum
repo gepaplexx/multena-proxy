@@ -331,6 +331,8 @@ github.com/observatorium/api v0.1.3-0.20231003032155-59517509a053 h1:zqnzBpK56Kf
 github.com/observatorium/api v0.1.3-0.20231003032155-59517509a053/go.mod h1:+HB/bePjA6RYZh/CN142MKG+GWKUhKhT+o1bqzKkf5k=
 github.com/observatorium/api v0.1.3-0.20231013122120-c7a88d3caf8e h1:NQ/Zb9ywFzGM8a/6TI1FdiXgEczasVrM71fV9Kgr11k=
 github.com/observatorium/api v0.1.3-0.20231013122120-c7a88d3caf8e/go.mod h1:v1KcL9tQsxkbk1kPY6nSHiWEoaTNPiU6tswuxAK+utU=
+github.com/observatorium/api v0.1.3-0.20231013144844-a92611bbc9a5 h1:gNumDI7jrCVLNgIweJb6o3QV8ESyoa6t8vwSe6AdkLE=
+github.com/observatorium/api v0.1.3-0.20231013144844-a92611bbc9a5/go.mod h1:2uqHV+gRS62Ma59hypR0m7/jur9R067lG5W+TnhZXRY=
 github.com/oklog/ulid v1.3.1 h1:EGfNDEx6MqHz8B3uNV6QAib1UR2Lm97sHi3ocA6ESJ4=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/opentracing/opentracing-go v1.2.0 h1:uEJPy/1a5RIPAJ0Ov+OIO8OxWu77jEv+1B0VhjKrZUs=

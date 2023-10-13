@@ -8,7 +8,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/gorilla/mux v1.8.0
-	github.com/observatorium/api v0.1.3-0.20231013122120-c7a88d3caf8e
+	github.com/observatorium/api v0.1.3-0.20231013144844-a92611bbc9a5
 	github.com/prometheus-community/prom-label-proxy v0.7.0
 	github.com/prometheus/client_golang v1.17.0
 	github.com/prometheus/prometheus v0.47.2
