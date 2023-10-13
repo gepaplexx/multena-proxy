@@ -8,7 +8,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/gorilla/mux v1.8.0
-	github.com/observatorium/api v0.1.3-0.20231003032155-59517509a053
+	github.com/observatorium/api v0.1.3-0.20231013122120-c7a88d3caf8e
 	github.com/prometheus-community/prom-label-proxy v0.7.0
 	github.com/prometheus/client_golang v1.17.0
 	github.com/prometheus/prometheus v0.47.1
@@ -74,7 +74,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.16.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
