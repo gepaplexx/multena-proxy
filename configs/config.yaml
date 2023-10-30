@@ -35,7 +35,7 @@ thanos:
   tenant_label: namespace # label to use for tenant
   cert: "./certs/thanos/tls.crt" # path to thanos mtls cert
   key: "./certs/thanos/tls.key" # path to thanos mtls key
-  Header:
+  header:
     "example": "application" # header to use
     "compresion": "gzip" # header to use
 
@@ -44,5 +44,5 @@ loki:
   tenant_label: kubernetes_namespace_name # label to use for tenant
   cert: "./certs/loki/tls.crt" # path to loki mtls cert
   key: "./certs/loki/tls.key" # path to loki mtls key
-  Header:
+  header:
     "X-Scope-OrgID": "application" # header to use for loki tenant
