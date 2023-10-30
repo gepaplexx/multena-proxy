@@ -107,6 +107,7 @@ type MySQLHandler struct {
 }
 
 func (m *MySQLHandler) Connect(a App) error {
+	m.TokenKey = a.Cfg.Db.TokenKey
 	password, err := os.ReadFile(a.Cfg.Db.PasswordPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Could not read db password")
