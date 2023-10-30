@@ -108,6 +108,7 @@ type MySQLHandler struct {
 
 func (m *MySQLHandler) Connect(a App) error {
 	m.TokenKey = a.Cfg.Db.TokenKey
+	m.Query = a.Cfg.Db.Query
 	password, err := os.ReadFile(a.Cfg.Db.PasswordPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Could not read db password")
@@ -162,7 +163,7 @@ func (m *MySQLHandler) GetLabels(token OAuthToken) (map[string]bool, bool) {
 		}
 	}(res)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Error while querying database")
+		log.Fatal().Err(err).Str("query", m.Query).Msg("Error while querying database")
 	}
 	labels := make(map[string]bool)
 	for res.Next() {
