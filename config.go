@@ -61,7 +61,7 @@ type Config struct {
 		UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
 		Cert         string            `mapstructure:"cert"`
 		Key          string            `mapstructure:"key"`
-		Header       map[string]string `mapstructure:"header"`
+		Headers      map[string]string `mapstructure:"headers"`
 	} `mapstructure:"thanos"`
 	Loki struct {
 		URL          string            `mapstructure:"url"`
@@ -69,7 +69,7 @@ type Config struct {
 		UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
 		Cert         string            `mapstructure:"cert"`
 		Key          string            `mapstructure:"key"`
-		Header       map[string]string `mapstructure:"header"`
+		Headers      map[string]string `mapstructure:"headers"`
 	} `mapstructure:"loki"`
 }
 

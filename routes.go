@@ -77,7 +77,7 @@ func (a *App) WithLoki() *App {
 			a.Cfg.Loki.TenantLabel,
 			a.Cfg.Loki.URL,
 			a.Cfg.Loki.UseMutualTLS,
-			a.Cfg.Loki.Header,
+			a.Cfg.Loki.Headers,
 			a)).Name(route.Url)
 	}
 	return a
@@ -111,7 +111,7 @@ func (a *App) WithThanos() *App {
 				a.Cfg.Thanos.TenantLabel,
 				a.Cfg.Thanos.URL,
 				a.Cfg.Thanos.UseMutualTLS,
-				a.Cfg.Thanos.Header,
+				a.Cfg.Thanos.Headers,
 				a)).Name(route.Url)
 
 	}
@@ -135,7 +135,7 @@ func (a *App) WithThanos() *App {
 //
 // Finally, if all checks and possible enforcement pass successfully, the request is
 // streamed to the upstream server.
-func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls bool, header map[string]string, a *App) func(http.ResponseWriter, *http.Request) {
+func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls bool, headers map[string]string, a *App) func(http.ResponseWriter, *http.Request) {
 	upstreamURL, err := url.Parse(dsURL)
 	if err != nil {
 		log.Fatal().Err(err).Str("url", dsURL).Msg("Error parsing URL")
@@ -152,7 +152,7 @@ func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls 
 			return
 		}
 		if skip {
-			streamUp(w, r, upstreamURL, tls, header, a)
+			streamUp(w, r, upstreamURL, tls, headers, a)
 			return
 		}
 
@@ -162,21 +162,21 @@ func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls 
 			return
 		}
 
-		streamUp(w, r, upstreamURL, tls, header, a)
+		streamUp(w, r, upstreamURL, tls, headers, a)
 	}
 }
 
 // streamUp forwards the provided HTTP request to the specified upstream URL using
 // a reverse proxy.It serves the upstream content back to the original client.
-func streamUp(w http.ResponseWriter, r *http.Request, upstreamURL *url.URL, tls bool, header map[string]string, a *App) {
-	setHeader(r, tls, header, a.ServiceAccountToken)
+func streamUp(w http.ResponseWriter, r *http.Request, upstreamURL *url.URL, tls bool, headers map[string]string, a *App) {
+	setHeaders(r, tls, headers, a.ServiceAccountToken)
 	proxy := httputil.NewSingleHostReverseProxy(upstreamURL)
 	proxy.ServeHTTP(w, r)
 }
 
-// setHeader modifies the HTTP request headers to set the Authorization and
+// setHeaders modifies the HTTP request headers to set the Authorization and
 // other headers based on the provided arguments.
-func setHeader(r *http.Request, tls bool, header map[string]string, sat string) {
+func setHeaders(r *http.Request, tls bool, header map[string]string, sat string) {
 	if !tls {
 		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sat))
 	}
