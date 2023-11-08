@@ -6,7 +6,7 @@ require (
 	github.com/MicahParks/keyfunc/v2 v2.1.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-sql-driver/mysql v1.7.1
-	github.com/golang-jwt/jwt/v5 v5.0.0
+	github.com/golang-jwt/jwt/v5 v5.1.0
 	github.com/gorilla/mux v1.8.0
 	github.com/observatorium/api v0.1.3-0.20231013144844-a92611bbc9a5
 	github.com/prometheus-community/prom-label-proxy v0.7.0
