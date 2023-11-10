@@ -41,7 +41,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0' #Hotfix, exit code is not working
+          exit-code: '0' # Hotfix, exit code is not working
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v2
@@ -49,7 +49,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
           category: 'code'
 
-      #Hotfix, run the scan twice because format sarif exit code is not working
+      # Hotfix, run the scan twice because format sarif exit code is not working
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
