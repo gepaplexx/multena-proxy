@@ -69,6 +69,7 @@ jobs:
           severity: 'CRITICAL,HIGH, MEDIUM, LOW, UNKNOWN'
           exit-code: '1'
           format: 'github'
+          github-pat: ${{ secrets.GITHUB_TOKEN }}
 
   test:
     runs-on: ubuntu-latest
