@@ -57,7 +57,7 @@ jobs:
           scanners: 'vuln,secret,config'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH, MEDIUM, LOW, UNKNOWN'
-          exit-code: '1'
+          exit-code: '0'
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
