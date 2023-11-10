@@ -57,19 +57,7 @@ jobs:
           scanners: 'vuln,secret,config'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH, MEDIUM, LOW, UNKNOWN'
-          exit-code: '0'
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          scanners: 'vuln,secret,config'
-          ignore-unfixed: true
-          severity: 'CRITICAL,HIGH, MEDIUM, LOW, UNKNOWN'
           exit-code: '1'
-          format: 'github'
-          github-pat: ${{ secrets.GITHUB_TOKEN }}
 
   test:
     runs-on: ubuntu-latest
@@ -183,6 +171,16 @@ jobs:
       - name: push image to trivy
         run: |
           buildah push ${{ steps.build-image.outputs.image-with-tag }} oci:./multena-proxy-oci
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          input: 'multena-proxy-oci'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH, MEDIUM, LOW, UNKNOWN'
+          exit-code: '1'
+          format: 'github'
+          github-pat: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
