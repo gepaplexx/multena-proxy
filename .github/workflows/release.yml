@@ -99,10 +99,10 @@ jobs:
         run: CGO_ENABLED=0 GOOS=linux GOEXPERIMENT=loopvar go build -ldflags="-X main.Commit=$(git rev-parse HEAD)" -o . -v ./...
 
       - name: Change permissions
-        run: | 
+        run: |
           sudo chgrp -R 0 multena-proxy
           sudo chmod -R g=u multena-proxy
-          
+
 
       - name: Copy build
         run: mkdir ./.cache && cp ./multena-proxy ./.cache/multena-proxy
