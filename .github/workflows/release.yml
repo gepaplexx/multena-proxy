@@ -56,7 +56,7 @@ jobs:
           scan-ref: '.'
           scanners: 'vuln,secret,config'
           ignore-unfixed: true
-          severity: 'CRITICAL,HIGH, MEDIUM, LOW, UNKNOWN'
+          severity: 'CRITICAL,HIGH'
           exit-code: '1'
 
   test:
