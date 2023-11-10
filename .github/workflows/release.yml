@@ -38,7 +38,7 @@ jobs:
           scan-ref: '.'
           scanners: 'vuln,secret,config'
           ignore-unfixed: true
-          format: 'sarif'
+          format: 'sarif, table'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN'
           exit-code: '0'
