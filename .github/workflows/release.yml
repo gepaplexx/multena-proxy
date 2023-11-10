@@ -56,7 +56,7 @@ jobs:
           scan-ref: '.'
           scanners: 'vuln,secret,config'
           ignore-unfixed: true
-          severity: 'CRITICAL,HIGH'
+          severity: 'CRITICAL,HIGH, MEDIUM, LOW, UNKNOWN'
           exit-code: '1'
 
       - name: Run Trivy vulnerability scanner
@@ -66,7 +66,7 @@ jobs:
           scan-ref: '.'
           scanners: 'vuln,secret,config'
           ignore-unfixed: true
-          severity: 'CRITICAL,HIGH'
+          severity: 'CRITICAL,HIGH, MEDIUM, LOW, UNKNOWN'
           exit-code: '1'
           format: 'github'
 
