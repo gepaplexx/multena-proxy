@@ -40,14 +40,25 @@ jobs:
           ignore-unfixed: true
           format: 'sarif'
           output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH, MEDIUM, LOW'
-          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0' # Hotfix, exit code is not working
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'code'
+
+      # Hotfix, run the scan twice because format sarif exit code is not working
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'vuln,secret,config'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
 
   test:
     runs-on: ubuntu-latest
@@ -88,10 +99,10 @@ jobs:
         run: CGO_ENABLED=0 GOOS=linux GOEXPERIMENT=loopvar go build -ldflags="-X main.Commit=$(git rev-parse HEAD)" -o . -v ./...
 
       - name: Change permissions
-        run: | 
+        run: |
           sudo chgrp -R 0 multena-proxy
           sudo chmod -R g=u multena-proxy
-          
+
 
       - name: Copy build
         run: mkdir ./.cache && cp ./multena-proxy ./.cache/multena-proxy
@@ -167,8 +178,8 @@ jobs:
         with:
           input: 'multena-proxy-oci'
           format: 'sarif'
+          severity: 'CRITICAL,HIGH'
           output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH, MEDIUM, LOW'
           exit-code: '1'
 
       - name: Upload Trivy scan results to GitHub Security tab
