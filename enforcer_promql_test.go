@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -43,12 +44,12 @@ func Test_promqlEnforcer(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "case 3",
+			name: "case 4",
 			args: args{
 				query:        "up",
 				tenantLabels: map[string]bool{"namespace": true, "grrr": true},
 			},
-			want:    "up{namespace=~\"namespace|grrr\"}",
+			want:    "up{namespace=~\"namespace|grrr\"}|s|up{namespace=~\"grrr|namespace\"}",
 			wantErr: false,
 		},
 	}
@@ -59,7 +60,7 @@ func Test_promqlEnforcer(t *testing.T) {
 				t.Errorf("promqlEnforcer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
+			if got != strings.Split(tt.want, "|s|")[0] && got != strings.Split(tt.want, "|s|")[1] {
 				t.Errorf("promqlEnforcer() = %v, want %v", got, tt.want)
 			}
 		})
