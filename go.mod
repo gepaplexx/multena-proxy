@@ -11,7 +11,7 @@ require (
 	github.com/observatorium/api v0.1.3-0.20240102035946-c74411f5240a
 	github.com/prometheus-community/prom-label-proxy v0.8.0
 	github.com/prometheus/client_golang v1.18.0
-	github.com/prometheus/prometheus v0.48.2
+	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/rs/zerolog v1.31.0
 	github.com/slok/go-http-metrics v0.11.0
 	github.com/spf13/viper v1.18.2
