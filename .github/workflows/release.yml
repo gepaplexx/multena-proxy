@@ -82,7 +82,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
           key: multena-proxy-${{ github.run_id }}
@@ -116,7 +116,7 @@ jobs:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: '0'
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
           key: multena-proxy-${{ github.run_id }}
