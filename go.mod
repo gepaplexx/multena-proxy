@@ -9,7 +9,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/gorilla/mux v1.8.1
 	github.com/observatorium/api v0.1.3-0.20240102035946-c74411f5240a
-	github.com/prometheus-community/prom-label-proxy v0.8.0
+	github.com/prometheus-community/prom-label-proxy v0.8.1
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/prometheus v0.48.2
 	github.com/rs/zerolog v1.31.0
