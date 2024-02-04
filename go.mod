@@ -12,7 +12,7 @@ require (
 	github.com/prometheus-community/prom-label-proxy v0.8.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/prometheus v0.48.2
-	github.com/rs/zerolog v1.31.0
+	github.com/rs/zerolog v1.32.0
 	github.com/slok/go-http-metrics v0.11.0
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.8.4
