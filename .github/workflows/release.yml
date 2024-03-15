@@ -20,7 +20,7 @@ jobs:
           cache: true
       - uses: actions/checkout@v4
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
         with:
           # Optional: golangci-lint command line arguments.
           args: --issues-exit-code=1 --timeout=5m --disable typecheck
@@ -41,7 +41,6 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0' # Hotfix, exit code is not working
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -58,7 +57,6 @@ jobs:
           scanners: 'vuln,secret,config'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
-          exit-code: '1'
 
   test:
     runs-on: ubuntu-latest
@@ -68,7 +66,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21.5'
+          go-version: '1.22.1'
           cache: true
 
       - name: Install dependencies
@@ -82,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
           key: multena-proxy-${{ github.run_id }}
@@ -90,7 +88,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21.5'
+          go-version: '1.22.1'
           cache: true
       - name: Install dependencies
         run: go get .
@@ -116,7 +114,7 @@ jobs:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: '0'
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
           key: multena-proxy-${{ github.run_id }}
@@ -180,7 +178,6 @@ jobs:
           format: 'sarif'
           severity: 'CRITICAL,HIGH'
           output: 'trivy-results.sarif'
-          exit-code: '1'
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
