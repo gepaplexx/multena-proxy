@@ -1,19 +1,18 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
-
-	"github.com/MicahParks/keyfunc/v2"
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 type Config struct {
@@ -184,26 +183,12 @@ func (a *App) WithTLSConfig() *App {
 
 func (a *App) WithJWKS() *App {
 	log.Info().Msg("Init JWKS config")
-	jwksURL := a.Cfg.Web.JwksCertURL
-	log.Info().Str("url", jwksURL).Msg("JWKS URL")
 
-	options := keyfunc.Options{
-		RefreshErrorHandler: func(err error) {
-			if err != nil {
-				log.Error().Err(err).Msg("Error refreshing Keyfunc")
-			}
-		},
-		RefreshInterval:   time.Hour,
-		RefreshRateLimit:  time.Minute * 5,
-		RefreshTimeout:    time.Second * 10,
-		RefreshUnknownKID: true,
-	}
-
-	jwks, err := keyfunc.Get(jwksURL, options)
+	jwks, err := keyfunc.NewDefaultCtx(context.Background(), []string{a.Cfg.Web.JwksCertURL}) // Context is used to end the refresh goroutine.
 	if err != nil {
-		log.Fatal().Err(err).Msg("Error init jwks")
+		log.Fatal().Err(err).Msg("Failed to create a keyfunc from the server's URL")
 	}
-	log.Info().Msg("Finished Keycloak config")
+	log.Info().Str("url", a.Cfg.Web.JwksCertURL).Msg("JWKS URL")
 	a.Jwks = jwks
 	return a
 }

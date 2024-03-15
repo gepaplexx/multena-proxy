@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"runtime"
 
-	"github.com/MicahParks/keyfunc/v2"
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -18,7 +18,7 @@ import (
 )
 
 type App struct {
-	Jwks                *keyfunc.JWKS
+	Jwks                keyfunc.Keyfunc
 	Cfg                 *Config
 	TlS                 *tls.Config
 	ServiceAccountToken string
