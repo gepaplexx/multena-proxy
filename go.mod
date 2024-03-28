@@ -11,7 +11,7 @@ require (
 	github.com/observatorium/api v0.1.3-0.20240311102334-63c873db5762
 	github.com/prometheus-community/prom-label-proxy v0.8.1
 	github.com/prometheus/client_golang v1.19.0
-	github.com/prometheus/prometheus v0.50.1
+	github.com/prometheus/prometheus v0.51.1
 	github.com/rs/zerolog v1.32.0
 	github.com/slok/go-http-metrics v0.11.0
 	github.com/spf13/viper v1.18.2
@@ -57,9 +57,9 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/alertmanager v0.26.0 // indirect
+	github.com/prometheus/alertmanager v0.27.0 // indirect
 	github.com/prometheus/client_model v0.6.0 // indirect
-	github.com/prometheus/common v0.49.0 // indirect
+	github.com/prometheus/common v0.49.1-0.20240306132007-4199f18c3e92 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
@@ -83,4 +83,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.50.1
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.51.1
