@@ -1,6 +1,6 @@
 module github.com/gepaplexx/multena-proxy
 
-go 1.22.1
+go 1.22.2
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.2.9
