@@ -3,7 +3,7 @@ module github.com/gepaplexx/multena-proxy
 go 1.22.1
 
 require (
-	github.com/MicahParks/keyfunc/v3 v3.2.9
+	github.com/MicahParks/keyfunc/v3 v3.3.5
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-sql-driver/mysql v1.8.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
@@ -21,7 +21,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/MicahParks/jwkset v0.5.15 // indirect
+	github.com/MicahParks/jwkset v0.5.19 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
