@@ -99,7 +99,7 @@ func checkLabels(queryLabels map[string]string, allowedTenantLabels map[string]b
 	return true, splitQueryLabels
 }
 
-func createEnforcer(tenantLabels []string, labelMatch string) *enforcer.Enforcer {
+func createEnforcer(tenantLabels []string, labelMatch string) *enforcer.PromQLEnforcer {
 	var matchType labels.MatchType
 	if len(tenantLabels) > 1 {
 		matchType = labels.MatchRegexp
@@ -107,7 +107,7 @@ func createEnforcer(tenantLabels []string, labelMatch string) *enforcer.Enforcer
 		matchType = labels.MatchEqual
 	}
 
-	return enforcer.NewEnforcer(true, &labels.Matcher{
+	return enforcer.NewPromQLEnforcer(true, &labels.Matcher{
 		Name:  labelMatch,
 		Type:  matchType,
 		Value: strings.Join(tenantLabels, "|"),
