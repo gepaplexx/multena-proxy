@@ -4,7 +4,7 @@ go 1.22.1
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.2.9
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-sql-driver/mysql v1.8.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gorilla/mux v1.8.1
