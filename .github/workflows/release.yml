@@ -20,14 +20,14 @@ jobs:
           cache: true
       - uses: actions/checkout@v4
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
           # Optional: golangci-lint command line arguments.
-          args: --issues-exit-code=1 --timeout=5m --disable typecheck
+          args: --issues-exit-code=1 --timeout=5m #--disable typecheck
       - name: go vet
         run: go vet ./...
 
-  scan:
+  scan-sarif:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
           ignore-unfixed: true
           format: 'sarif'
           output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -48,15 +48,24 @@ jobs:
           sarif_file: 'trivy-results.sarif'
           category: 'code'
 
-      # Hotfix, run the scan twice because format sarif exit code is not working
+
+
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.29.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
-          scanners: 'vuln,secret,config'
+          scanners: 'vuln,secret,misconfig'
           ignore-unfixed: true
+          exit-code: '1'
           severity: 'CRITICAL,HIGH'
+
+
+
 
   test:
     runs-on: ubuntu-latest
@@ -128,7 +137,7 @@ jobs:
 
       - name: Get tag version
         id: tag_version
-        uses: anothrNick/github-tag-action@1.67.0
+        uses: anothrNick/github-tag-action@1.71.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
@@ -145,8 +154,8 @@ jobs:
           tags: |
             type=schedule
             type=ref,event=branch
-            type=raw,value=${{ github.head_ref }}-${{ steps.tag_version.outputs.new_tag }}, enable=${{ github.ref != 'refs/heads/main' }}
-            type=raw,value=${{ github.head_ref }}-${{ steps.tag_version.outputs.new_tag }}-${{github.sha}}, enable=${{ github.ref != 'refs/heads/main' }}
+            type=raw,value=${{ steps.tag_version.outputs.new_tag }}-${{ github.head_ref }}, enable=${{ github.ref != 'refs/heads/main' }}
+            type=raw,value=${{ steps.tag_version.outputs.new_tag }}-${{ github.head_ref }}-${{github.sha}}, enable=${{ github.ref != 'refs/heads/main' }}
             type=raw,value=${{github.sha}}
             type=semver,pattern={{version}},value=${{ steps.tag_version.outputs.new_tag }},enable={{is_default_branch}}
             type=raw,value=latest,enable={{is_default_branch}}
@@ -177,6 +186,7 @@ jobs:
           input: 'multena-proxy-oci'
           format: 'sarif'
           severity: 'CRITICAL,HIGH'
+          exit-code: '1'
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results to GitHub Security tab
@@ -195,16 +205,4 @@ jobs:
           image: ${{ steps.build-image.outputs.image }}
           tags: ${{ steps.build-image.outputs.tags }}
           registry: ${{ env.REGISTRY }}
-
-
-      - name: Get tag version
-        if: ${{ github.event_name != 'pull_request' }}
-        id: tag_version_final
-        uses: anothrNick/github-tag-action@1.67.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
-          DRY_RUN: false
-          DEFAULT_BUMP: patch
-          RELEASE_BRANCHES: main
 
