@@ -15,61 +15,79 @@ import (
 	"strings"
 )
 
+type LogConfig struct {
+	Level     int  `mapstructure:"level"`
+	LogTokens bool `mapstructure:"log_tokens"`
+}
+
+type WebConfig struct {
+	ProxyPort           int    `mapstructure:"proxy_port"`
+	MetricsPort         int    `mapstructure:"metrics_port"`
+	Host                string `mapstructure:"host"`
+	TLSVerifySkip       bool   `mapstructure:"tls_verify_skip"`
+	TrustedRootCaPath   string `mapstructure:"trusted_root_ca_path"`
+	LabelStoreKind      string `mapstructure:"label_store_kind"`
+	JwksCertURL         string `mapstructure:"jwks_cert_url"`
+	OAuthGroupName      string `mapstructure:"oauth_group_name"`
+	ServiceAccountToken string `mapstructure:"service_account_token"`
+}
+
+type AdminConfig struct {
+	Bypass bool   `mapstructure:"bypass"`
+	Group  string `mapstructure:"group"`
+}
+
+type AlertConfig struct {
+	Enabled     bool   `mapstructure:"enabled"`
+	TokenHeader string `mapstructure:"token_header"`
+	CertURL     string `mapstructure:"alert_cert_url"`
+}
+
+type DevConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	Username string `mapstructure:"username"`
+}
+
+type DbConfig struct {
+	Enabled      bool   `mapstructure:"enabled"`
+	User         string `mapstructure:"user"`
+	PasswordPath string `mapstructure:"password_path"`
+	Host         string `mapstructure:"host"`
+	Port         int    `mapstructure:"port"`
+	DbName       string `mapstructure:"dbName"`
+	Query        string `mapstructure:"query"`
+	TokenKey     string `mapstructure:"token_key"`
+}
+
+type ThanosConfig struct {
+	URL          string            `mapstructure:"url"`
+	TenantLabel  string            `mapstructure:"tenant_label"`
+	UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
+	Cert         string            `mapstructure:"cert"`
+	Key          string            `mapstructure:"key"`
+	Headers      map[string]string `mapstructure:"headers"`
+	ActorHeader  string            `mapstructure:"actor_header"`
+}
+
+type LokiConfig struct {
+	URL          string            `mapstructure:"url"`
+	TenantLabel  string            `mapstructure:"tenant_label"`
+	UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
+	Cert         string            `mapstructure:"cert"`
+	Key          string            `mapstructure:"key"`
+	Headers      map[string]string `mapstructure:"headers"`
+	ActorHeader  string            `mapstructure:"actor_header"`
+}
+
 type Config struct {
-	Log struct {
-		Level     int  `mapstructure:"level"`
-		LogTokens bool `mapstructure:"log_tokens"`
-	} `mapstructure:"log"`
-
-	Web struct {
-		ProxyPort           int    `mapstructure:"proxy_port"`
-		MetricsPort         int    `mapstructure:"metrics_port"`
-		Host                string `mapstructure:"host"`
-		TLSVerifySkip       bool   `mapstructure:"tls_verify_skip"`
-		TrustedRootCaPath   string `mapstructure:"trusted_root_ca_path"`
-		LabelStoreKind      string `mapstructure:"label_store_kind"`
-		JwksCertURL         string `mapstructure:"jwks_cert_url"`
-		OAuthGroupName      string `mapstructure:"oauth_group_name"`
-		ServiceAccountToken string `mapstructure:"service_account_token"`
-	} `mapstructure:"web"`
-
-	Admin struct {
-		Bypass bool   `mapstructure:"bypass"`
-		Group  string `mapstructure:"group"`
-	} `mapstructure:"admin"`
-
-	Dev struct {
-		Enabled  bool   `mapstructure:"enabled"`
-		Username string `mapstructure:"username"`
-	} `mapstructure:"dev"`
-
-	Db struct {
-		Enabled      bool   `mapstructure:"enabled"`
-		User         string `mapstructure:"user"`
-		PasswordPath string `mapstructure:"password_path"`
-		Host         string `mapstructure:"host"`
-		Port         int    `mapstructure:"port"`
-		DbName       string `mapstructure:"dbName"`
-		Query        string `mapstructure:"query"`
-		TokenKey     string `mapstructure:"token_key"`
-	} `mapstructure:"db"`
-
-	Thanos struct {
-		URL          string            `mapstructure:"url"`
-		TenantLabel  string            `mapstructure:"tenant_label"`
-		UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
-		Cert         string            `mapstructure:"cert"`
-		Key          string            `mapstructure:"key"`
-		Headers      map[string]string `mapstructure:"headers"`
-	} `mapstructure:"thanos"`
-	Loki struct {
-		URL          string            `mapstructure:"url"`
-		TenantLabel  string            `mapstructure:"tenant_label"`
-		UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
-		Cert         string            `mapstructure:"cert"`
-		Key          string            `mapstructure:"key"`
-		Headers      map[string]string `mapstructure:"headers"`
-	} `mapstructure:"loki"`
+	Log    LogConfig    `mapstructure:"log"`
+	Web    WebConfig    `mapstructure:"web"`
+	Admin  AdminConfig  `mapstructure:"admin"`
+	Alert  AlertConfig  `mapstructure:"alert"`
+	Dev    DevConfig    `mapstructure:"dev"`
+	Db     DbConfig     `mapstructure:"db"`
+	Thanos ThanosConfig `mapstructure:"thanos"`
+	Loki   LokiConfig   `mapstructure:"loki"`
 }
 
 func (a *App) WithConfig() *App {
@@ -183,8 +201,11 @@ func (a *App) WithTLSConfig() *App {
 
 func (a *App) WithJWKS() *App {
 	log.Info().Msg("Init JWKS config")
-
-	jwks, err := keyfunc.NewDefaultCtx(context.Background(), []string{a.Cfg.Web.JwksCertURL}) // Context is used to end the refresh goroutine.
+	urls := []string{a.Cfg.Web.JwksCertURL}
+	if a.Cfg.Alert.Enabled {
+		urls = []string{a.Cfg.Web.JwksCertURL, a.Cfg.Alert.CertURL}
+	}
+	jwks, err := keyfunc.NewDefaultCtx(context.Background(), urls)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create a keyfunc from the server's URL")
 	}
