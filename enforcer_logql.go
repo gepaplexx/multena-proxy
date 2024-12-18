@@ -40,7 +40,7 @@ func (LogQLEnforcer) Enforce(query string, tenantLabels map[string]bool, labelMa
 	expr.Walk(func(expr interface{}) {
 		switch labelExpression := expr.(type) {
 		case *logqlv2.StreamMatcherExpr:
-			matchers, err := matchNamespaceMatchers(labelExpression.Matchers(), tenantLabels, labelMatch)
+			matchers, err := MatchTenantLabelMatchers(labelExpression.Matchers(), tenantLabels, labelMatch)
 			if err != nil {
 				errMsg = err
 				return
@@ -57,25 +57,25 @@ func (LogQLEnforcer) Enforce(query string, tenantLabels map[string]bool, labelMa
 	return expr.String(), nil
 }
 
-// matchNamespaceMatchers ensures tenant label matchers in a LogQL query adhere to provided tenant labels.
+// MatchTenantLabelMatchers ensures tenant label matchers in a LogQL query adhere to provided tenant labels.
 // It verifies that the tenant label exists in the query matchers, validating or modifying its values based on tenantLabels.
 // If the tenant label is absent in the matchers, it's added along with all values from tenantLabels.
 // Returns an error for an unauthorized namespace and nil on success.
-func matchNamespaceMatchers(queryMatches []*labels.Matcher, tenantLabels map[string]bool, labelMatch string) ([]*labels.Matcher, error) {
-	foundNamespace := false
+func MatchTenantLabelMatchers(queryMatches []*labels.Matcher, tenantLabels map[string]bool, labelMatch string) ([]*labels.Matcher, error) {
+	foundTenantLabel := false
 	for _, match := range queryMatches {
 		if match.Name == labelMatch {
-			foundNamespace = true
+			foundTenantLabel = true
 			queryLabels := strings.Split(match.Value, "|")
 			for _, queryLabel := range queryLabels {
 				_, ok := tenantLabels[queryLabel]
 				if !ok {
-					return nil, fmt.Errorf("unauthorized namespace %s", queryLabel)
+					return nil, fmt.Errorf("unauthorized label %s", queryLabel)
 				}
 			}
 		}
 	}
-	if !foundNamespace {
+	if !foundTenantLabel {
 		matchType := labels.MatchEqual
 		if len(tenantLabels) > 1 {
 			matchType = labels.MatchRegexp
