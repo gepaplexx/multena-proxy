@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -101,6 +102,7 @@ func (a *App) WithThanos() *App {
 		{Url: "/api/v1/label/{label}/values", MatchWord: "match[]"},
 		{Url: "/api/v1/query_exemplars", MatchWord: "query"},
 		{Url: "/api/v1/status/buildinfo", MatchWord: "query"},
+		{Url: "/api/v1/metadata", MatchWord: "query"},
 	}
 	thanosRouter := a.e.PathPrefix("").Subrouter()
 	for _, route := range routes {
@@ -162,8 +164,41 @@ func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls 
 			return
 		}
 
+		if _, ok := enforcer.(LogQLEnforcer); ok {
+			err := setActorHeaderLogQL(r, oauthToken, a)
+			if err != nil {
+				logAndWriteError(w, http.StatusForbidden, err, "")
+				return
+			}
+		}
+		if _, ok := enforcer.(PromQLEnforcer); ok {
+			err := setActorHeaderPromQL(r, oauthToken, a)
+			if err != nil {
+				logAndWriteError(w, http.StatusForbidden, err, "")
+				return
+			}
+		}
+
 		streamUp(w, r, upstreamURL, tls, headers, a)
 	}
+}
+
+func setActorHeaderLogQL(r *http.Request, token OAuthToken, a *App) error {
+	if a.Cfg.Loki.ActorHeader != "" {
+		data := fmt.Sprintf("%s%s", token.PreferredUsername, token.Email)
+		encoded := base64.StdEncoding.EncodeToString([]byte(data))
+		r.Header.Set(a.Cfg.Loki.ActorHeader, encoded)
+	}
+	return nil
+}
+
+func setActorHeaderPromQL(r *http.Request, token OAuthToken, a *App) error {
+	if a.Cfg.Thanos.ActorHeader != "" {
+		data := fmt.Sprintf("%s%s", token.PreferredUsername, token.Email)
+		encoded := base64.StdEncoding.EncodeToString([]byte(data))
+		r.Header.Set(a.Cfg.Thanos.ActorHeader, encoded)
+	}
+	return nil
 }
 
 // streamUp forwards the provided HTTP request to the specified upstream URL using
