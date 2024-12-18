@@ -87,7 +87,7 @@ func TestMatchNamespaceMatchers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := matchNamespaceMatchers(tt.matchers, tt.tenantLabels, "kubernetes_namespace_name")
+			_, err := MatchTenantLabelMatchers(tt.matchers, tt.tenantLabels, "kubernetes_namespace_name")
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {

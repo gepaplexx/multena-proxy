@@ -15,7 +15,7 @@ import (
 // OAuthToken represents the structure of an OAuth token.
 // It holds user-related information extracted from the token.
 type OAuthToken struct {
-	Groups            []string `json:"-"`
+	Groups            []string `json:"-,omitempty"`
 	PreferredUsername string   `json:"preferred_username"`
 	Email             string   `json:"email"`
 	jwt.RegisteredClaims
@@ -24,11 +24,22 @@ type OAuthToken struct {
 // getToken retrieves the OAuth token from the incoming HTTP request.
 // It extracts, parses, and validates the token from the Authorization header.
 func getToken(r *http.Request, a *App) (OAuthToken, error) {
-	authToken, err := trimBearerToken(r)
-	if err != nil {
-		return OAuthToken{}, err
+	authToken := r.Header.Get("Authorization")
+	if authToken == "" {
+		if a.Cfg.Alert.Enabled && r.Header.Get(a.Cfg.Alert.TokenHeader) != "" {
+			authToken = r.Header.Get(a.Cfg.Alert.TokenHeader)
+		} else {
+			return OAuthToken{}, errors.New("no Authorization header found")
+		}
 	}
-	oauthToken, token, err := parseJwtToken(authToken, a)
+	log.Trace().Str("authToken", authToken).Msg("AuthToken")
+	splitToken := strings.Split(authToken, "Bearer")
+	log.Trace().Strs("splitToken", splitToken).Msg("SplitToken")
+	if len(splitToken) != 2 {
+		return OAuthToken{}, errors.New("invalid Authorization header")
+	}
+
+	oauthToken, token, err := parseJwtToken(strings.TrimSpace(splitToken[1]), a)
 	if err != nil {
 		return OAuthToken{}, fmt.Errorf("error parsing token")
 	}
@@ -36,20 +47,6 @@ func getToken(r *http.Request, a *App) (OAuthToken, error) {
 		return OAuthToken{}, fmt.Errorf("invalid token")
 	}
 	return oauthToken, nil
-}
-
-// trimBearerToken extracts the token from the Authorization header of the HTTP request.
-// It trims the "Bearer" prefix from the Authorization header and returns the actual token.
-func trimBearerToken(r *http.Request) (string, error) {
-	authToken := r.Header.Get("Authorization")
-	if authToken == "" {
-		return "", errors.New("no Authorization header found")
-	}
-	splitToken := strings.Split(authToken, "Bearer")
-	if len(splitToken) != 2 {
-		return "", errors.New("invalid Authorization header")
-	}
-	return strings.TrimSpace(splitToken[1]), nil
 }
 
 // parseJwtToken parses the JWT token string and constructs an OAuthToken from the parsed claims.
@@ -60,23 +57,36 @@ func parseJwtToken(tokenString string, a *App) (OAuthToken, *jwt.Token, error) {
 
 	token, err := jwt.ParseWithClaims(tokenString, &claimsMap, a.Jwks.Keyfunc)
 	if err != nil {
+		log.Error().Err(err).Msg("Error parsing token")
 		return oAuthToken, nil, err
+	}
+
+	if !token.Valid {
+		log.Trace().Msg("Token is invalid")
 	}
 
 	if v, ok := claimsMap["preferred_username"].(string); ok {
 		oAuthToken.PreferredUsername = v
+		log.Trace().Str("preferred_username", v).Msg("PreferredUsername")
 	}
+
 	if v, ok := claimsMap["email"].(string); ok {
+		if !strings.Contains(v, "@") {
+			log.Warn().Str("email", v).Msg("Email does not contain '@', therefore not an email. Could be sus")
+		}
+		log.Trace().Str("email", v).Msg("Email")
 		oAuthToken.Email = v
 	}
 
 	if v, ok := claimsMap[a.Cfg.Web.OAuthGroupName].([]interface{}); ok {
 		for _, item := range v {
 			if s, ok := item.(string); ok {
+				log.Trace().Str("group", s).Msg("Group")
 				oAuthToken.Groups = append(oAuthToken.Groups, s)
 			}
 		}
 	}
+
 	return oAuthToken, token, err
 }
 

@@ -183,8 +183,9 @@ url: https://localhost:9091 # url to the thanos or loki endpoint     | Required
 tenant_label: namespace # label which is used to enforce the query   | Required
 cert: "./certs/thanos/tls.crt" # path to the mtls certificate        | Optional
 key: "./certs/thanos/tls.key" # path to the mtls key                 | Optional
-Header: # headers which will be added to the request                 | Optional
+token: # headers which will be added to the request                 | Optional
   X-Scope-OrgID: "application"
+actor_header: "X-Loki-Actor-Path" # header that will be filled with a base64 username/email to enable loki fair usage | Optional 
 
 ```
 
@@ -202,6 +203,20 @@ log:
 admin:
   bypass: true # enable bypassing the enforcing steps
   group: gepardec-run-admins # group which is allowed to bypass the enforcing steps
+```
+
+#### alert section
+Grafana Alerting via Multena
+This section enables Grafana alerting functionality through Multena by addressing the limitations of using an OAuth token-secured datasource. When Grafana sends metrics or log requests as part of its alerting process, these requests originate from Grafana itself rather than a user, meaning they lack a valid OAuth token. 
+To accommodate this, a fallback header can be configured in this section, allowing Multena to authenticate these requests.
+
+While this fallback introduces a minimal security risk, it is specifically designed to be used only when requests lack a OAuth token. By enabling this feature, you allow Grafana to seamlessly integrate with your Multena setup for alerting purposes while maintaining reasonable security practices.
+
+```yaml
+alert:
+  enabled: false # enable grafana alerting
+  token_header: "X-Multena-alerting" # header which will be filled with the jwt token, as Grafana will not have a oauth token if a user setsup alerting via Grafana alerting.
+  alert_cert_url: "https://sso.example.com/realms/internal/protocol/openid-connect/certs" # url to the jwks certificate that will be used to validate the jwt token that is only for alerting
 ```
 
 #### db section

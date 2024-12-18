@@ -78,7 +78,7 @@ func enforceLabels(queryLabels map[string]string, allowedTenantLabels map[string
 	if _, ok := queryLabels[labelMatch]; ok {
 		ok, tenantLabels := checkLabels(queryLabels, allowedTenantLabels, labelMatch)
 		if !ok {
-			return nil, fmt.Errorf("user not allowed with namespace %s", tenantLabels[0])
+			return nil, fmt.Errorf("user not allowed with tenant label %s", tenantLabels[0])
 		}
 		return tenantLabels, nil
 	}
