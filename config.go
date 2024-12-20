@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/MicahParks/keyfunc/v3"
+	"encoding/json"
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -41,6 +41,7 @@ type AlertConfig struct {
 	Enabled     bool   `mapstructure:"enabled"`
 	TokenHeader string `mapstructure:"token_header"`
 	CertURL     string `mapstructure:"alert_cert_url"`
+	Cert        string `mapstructure:"alert_cert"`
 }
 
 type DevConfig struct {
@@ -98,6 +99,7 @@ func (a *App) WithConfig() *App {
 	v.AddConfigPath("./configs")
 	err := v.MergeInConfig()
 	if err != nil {
+		log.Fatal().Err(err).Msg("Error no config found")
 		return nil
 	}
 	a.Cfg = &Config{}
@@ -205,7 +207,12 @@ func (a *App) WithJWKS() *App {
 	if a.Cfg.Alert.Enabled {
 		urls = []string{a.Cfg.Web.JwksCertURL, a.Cfg.Alert.CertURL}
 	}
-	jwks, err := keyfunc.NewDefaultCtx(context.Background(), urls)
+	var cert json.RawMessage
+	cert = nil
+	if a.Cfg.Alert.Cert != "" {
+		cert = json.RawMessage(a.Cfg.Alert.Cert)
+	}
+	jwks, err := NewCombinedJwks(context.Background(), urls, cert)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create a keyfunc from the server's URL")
 	}
