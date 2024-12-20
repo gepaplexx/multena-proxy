@@ -217,6 +217,7 @@ alert:
   enabled: false # enable grafana alerting
   token_header: "X-Multena-alerting" # header which will be filled with the jwt token, as Grafana will not have a oauth token if a user setsup alerting via Grafana alerting.
   alert_cert_url: "https://sso.example.com/realms/internal/protocol/openid-connect/certs" # url to the jwks certificate that will be used to validate the jwt token that is only for alerting
+  alert_cert: '{"keys":[{"kid":"","kty":"RSA","alg":"RS256","use":"sig","n":""],"x5t":"","x5t#S256":""}]}' # an extra jwks certificate that will be used to validate the jwt token that is supoosed for alerting but will be also valid for other tokens
 ```
 
 #### db section

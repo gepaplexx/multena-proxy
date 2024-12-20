@@ -16,6 +16,12 @@ admin:
   bypass: true # enable admin bypass
   group: gepardec-run-admins # group name for admin bypass
 
+alert:
+    enabled: false # enable alerting
+    token_header: "X-Multena-alert" # header to use for the token
+    alert_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs # url to jwks cert of oauth provider
+    alert_cert: '{"keys":[{"kid":"hXq9diKCkHZaB7QSj525rXvFxNGOPx1VJH0U3da1su4","kty":"RSA","alg":"RS256","use":"sig","n":"0H_0xxGplF1nm3OTQitGXz3S-3woZfu_APxrGIKY8i43m6K0RiFo11wVmU-4Uyko4-hvKSUV1FgMOvq5eU4e8wqnb7th3fQpKvY_HT1RHokCUUn37hLXISiOrtb21vjYmJkyw_P1ToSgQdLsryIaEisKhXD_62pBtK8fYOo3Bx-ggCSm3OjWBEUeozWFhRYsgeCrTKUbqlAQb3rlW4aA0Ay7XJfgSuMxWIYR49hX1FFPxkHnyofWDSuSE6gUiF1VhYoYi1V4siXmVEp2FYJmXBHvrbtvmfYXg6NPR7m7aUoagdcK0T1jInUpZMk_WRxPMlbTO9WfcdXXUpXhDWruWw","e":"AQAB","x5c":["MIIClTCCAX0CBgFiUtsSYDANBgkqhkiG9w0BAQsFADAOMQwwCgYDVQQDDANhcGEwHhcNMTgwMzIzMTIzMzMxWhcNMjgwMzIzMTIzNTExWjAOMQwwCgYDVQQDDANhcGEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDQf/THEamUXWebc5NCK0ZfPdL7fChl+78A/GsYgpjyLjeborRGIWjXXBWZT7hTKSjj6G8pJRXUWAw6+rl5Th7zCqdvu2Hd9Ckq9j8dPVEeiQJRSffuEtchKI6u1vbW+NiYmTLD8/VOhKBB0uyvIhoSKwqFcP/rakG0rx9g6jcHH6CAJKbc6NYERR6jNYWFFiyB4KtMpRuqUBBveuVbhoDQDLtcl+BK4zFYhhHj2FfUUU/GQefKh9YNK5ITqBSIXVWFihiLVXiyJeZUSnYVgmZcEe+tu2+Z9heDo09HubtpShqB1wrRPWMidSlkyT9ZHE8yVtM71Z9x1ddSleENau5bAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAAZT9fh2G/buEy74xZmfkKlhzXgpJSO43b4qelzws8/BiV2VokZkUykq+8/dbMzMmzQkRl9hQPRtquVhG4NdI+3hiVxSD7thH7l7RjNCXkdR4pLWRCCknBHB0rOwoz3GrM1NkHFC8m80N+vTj3cyMuCFC2mziv9t0EmRhtLEY3r+DawOudk19pbo+j8kkVgoNDxjXMR0YwSdL9Nim/LenJ/I5Y6KwXy4GEMLxGptMuVkj26BXlhVv2SfuxXiwUG1+zNzP327CZgwWbfKVvB0S98XMhCxFzXWu/RzSe0F02RmxJJ6n1z1tpkRkQCBdnCY6I2iisbYsIv2T3LqAWll3kU="],"x5t":"dlKWNkbMJ299cgIzU70toltlNiU","x5t#S256":"SGWTaLggCJGgxSgw58OIsEaRY-5DEa7y7SzTgo3Jt0o"}]}'
+
 dev:
   enabled: false # enable dev mode, but dont use in production
   username: example # username for dev mode
@@ -46,3 +52,6 @@ loki:
   key: "./certs/loki/tls.key" # path to loki mtls key
   headers:
     "X-Scope-OrgID": "application" # header to use for loki tenant
+
+NotRealKey:
+  forTesting: purpose
