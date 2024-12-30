@@ -9,6 +9,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  GO_VERSION: '1.23.4'
+
 jobs:
   lint:
     name: lint
@@ -16,7 +19,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21.5'
+          go-version: ${{ env.GO_VERSION }}
           cache: true
       - uses: actions/checkout@v4
       - name: golangci-lint
@@ -75,7 +78,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22.1'
+          go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Install dependencies
@@ -91,13 +94,13 @@ jobs:
 
       - uses: actions/cache@v4
         with:
-          path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
+          path: ./.cache  # Note that this path is not influenced by working-directory set in defaults
           key: multena-proxy-${{ github.run_id }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22.1'
+          go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Install dependencies
         run: go get .
@@ -125,7 +128,7 @@ jobs:
 
       - uses: actions/cache@v4
         with:
-          path: ./.cache  # Note that this path is not influenced by working-directory set in defaults, for example
+          path: ./.cache  # Note that this path is not influenced by working-directory set in defaults
           key: multena-proxy-${{ github.run_id }}
           fail-on-cache-miss: true
 
