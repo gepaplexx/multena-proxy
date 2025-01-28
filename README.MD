@@ -114,7 +114,7 @@ helm repo update
 helm upgrade multena gepardec/gp-multena -n <grafana-namespace>
 ```
 
-> **_NOTE:_** If your using the grafana operator, the helm chart provides an option to install
+> **_NOTE:_** If you're using the grafana operator, the helm chart provides an option to install
 > grafana-operator-datasources
 > which simplifies the deployment of Multena. If you deploy Multena without the grafana-operator-datasources you have to
 > configure the datasource manually.
