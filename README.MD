@@ -179,14 +179,13 @@ web:
 
 ```yaml
 thanos|loki: # choose either thanos or loki
-url: https://localhost:9091 # url to the thanos or loki endpoint     | Required
-tenant_label: namespace # label which is used to enforce the query   | Required
-cert: "./certs/thanos/tls.crt" # path to the mtls certificate        | Optional
-key: "./certs/thanos/tls.key" # path to the mtls key                 | Optional
-token: # headers which will be added to the request                 | Optional
-  X-Scope-OrgID: "application"
-actor_header: "X-Loki-Actor-Path" # header that will be filled with a base64 username/email to enable loki fair usage | Optional 
-
+  url: https://localhost:9091 # url to the thanos or loki endpoint     | Required
+  tenant_label: namespace # label which is used to enforce the query   | Required
+  cert: "./certs/thanos/tls.crt" # path to the mtls certificate        | Optional
+  key: "./certs/thanos/tls.key" # path to the mtls key                 | Optional
+  token: # headers which will be added to the request                 | Optional
+    X-Scope-OrgID: "application"
+  actor_header: "X-Loki-Actor-Path" # header that will be filled with a base64 username/email to enable loki fair usage | Optional 
 ```
 
 #### logging section
