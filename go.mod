@@ -3,6 +3,7 @@ module github.com/gepaplexx/multena-proxy
 go 1.23.4
 
 require (
+	github.com/MicahParks/jwkset v0.5.19
 	github.com/MicahParks/keyfunc/v3 v3.3.5
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-sql-driver/mysql v1.8.1
@@ -12,7 +13,7 @@ require (
 	github.com/prometheus-community/prom-label-proxy v0.11.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/prometheus v0.55.1
-	github.com/rs/zerolog v1.33.0
+	github.com/rs/zerolog v1.34.0
 	github.com/slok/go-http-metrics v0.13.0
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
@@ -21,7 +22,6 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/MicahParks/jwkset v0.5.19 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
