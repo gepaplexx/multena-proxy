@@ -123,7 +123,7 @@ helm upgrade multena gepardec/gp-multena -n <grafana-namespace>
 
 ## Labelstore Providers
 
-> **_NOTE:_** Currently Multena offers two different providers for label lookup, namely ConfigMap and MySQL.
+> **_NOTE:_** Currently Multena offers three different providers for label lookup, namely ConfigMap, MySQL and Verbatim.
 
 ### ConfigMap Provider
 
@@ -158,6 +158,12 @@ the relevant label information from the MySQL database.
 This makes only sense if you already have a MySQL database with a systematic way to get the permissions for a user.
 
 > **_NOTE:_** As every query sends a query to the database, we recommend enabling caching for the database.
+
+### Verbatim Provider
+
+The verbatim provider uses the value of a token claim verbatim as allowed tenant labels. This allows you to configure the allowed labels directly in your OAuth IdP.
+
+Take care that the OAuth token does not exceed the maximum allowed size for HTTP headers! This provider only works for a couple of rather short allowed tenant labels.
 
 ### config.yaml
 

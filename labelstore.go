@@ -34,6 +34,8 @@ func (a *App) WithLabelStore() *App {
 		a.LabelStore = &ConfigMapHandler{}
 	case "mysql":
 		a.LabelStore = &MySQLHandler{}
+	case "verbatim":
+		a.LabelStore = &VerbatimHandler{}
 	default:
 		log.Fatal().Str("type", a.Cfg.Web.LabelStoreKind).Msg("Unknown label store type")
 	}
@@ -43,6 +45,8 @@ func (a *App) WithLabelStore() *App {
 	}
 	return a
 }
+
+const clusterwide = "#cluster-wide"
 
 type ConfigMapHandler struct {
 	labels map[string]map[string]bool
@@ -85,16 +89,16 @@ func (c *ConfigMapHandler) GetLabels(token OAuthToken) (map[string]bool, bool) {
 	mergedNamespaces := make(map[string]bool, len(c.labels[username])*2)
 	for k := range c.labels[username] {
 		mergedNamespaces[k] = true
-		if k == "#cluster-wide" {
+		if k == clusterwide {
 			return nil, true
 		}
 	}
 	for _, group := range groups {
 		for k := range c.labels[group] {
-			mergedNamespaces[k] = true
-			if k == "#cluster-wide" {
+			if k == clusterwide {
 				return nil, true
 			}
+			mergedNamespaces[k] = true
 		}
 	}
 	return mergedNamespaces, false
@@ -175,4 +179,22 @@ func (m *MySQLHandler) GetLabels(token OAuthToken) (map[string]bool, bool) {
 		}
 	}
 	return labels, false
+}
+
+type VerbatimHandler struct {}
+
+func (m *VerbatimHandler) Connect(_ App) error {
+	return nil
+}
+
+func (m *VerbatimHandler) GetLabels(token OAuthToken) (map[string]bool, bool) {
+	groups := token.Groups
+	mergedNamespaces := make(map[string]bool, len(groups))
+	for _, group := range groups {
+		if group == clusterwide {
+			return nil, true
+		}
+		mergedNamespaces[group] = true
+	}
+	return mergedNamespaces, false
 }
