@@ -1,4 +1,4 @@
-FROM golang:alpine3.18 as go-builder
+FROM golang:alpine3.21 as go-builder
 WORKDIR /app/multena-proxy
 COPY go.mod go.sum ./
 RUN go mod tidy
@@ -7,9 +7,8 @@ RUN go build .
 RUN chgrp -R 0 /app && chmod -R g=u /app
 
 FROM scratch
-WORKDIR /app/
 COPY --from=go-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/ca/ca-certificates.crt
-COPY --from=go-builder /app/multena-proxy/multena-proxy .
+COPY --from=go-builder /app/multena-proxy/multena-proxy /usr/local/bin/multena-proxy
 
 HEALTHCHECK --timeout=10s CMD curl --fail http://localhost:8080/healthz || exit 1
 USER nonroot:nonroot
