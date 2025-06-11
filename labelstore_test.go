@@ -81,3 +81,58 @@ func TestGetLabelsCM(t *testing.T) {
 		})
 	}
 }
+
+func TestGetLabelsCMConnect(t *testing.T) {
+	cmh := ConfigMapHandler{}
+	cases := []struct {
+		name     string
+		username string
+		groups   []string
+		expected map[string]bool
+		skip     bool
+	}{
+		{
+			name:     "User with single namespace and no groups",
+			username: "user1",
+			groups:   []string{},
+			expected: map[string]bool{
+				"hogarama": true,
+			},
+			skip: false,
+		},
+		{
+			name:     "User with multiple namespaces and no groups",
+			username: "user3",
+			groups:   []string{},
+			expected: map[string]bool{
+				"grafana":               true,
+				"opernshift-logging":    true,
+				"opernshift-monitoring": true,
+			},
+			skip: false,
+		},
+		{
+			name:     "User with mixed case labels",
+			username: "user4",
+			groups:   []string{},
+			expected: map[string]bool{
+				"Upper-case": true,
+				"lower-case": true,
+			},
+			skip: false,
+		},
+	}
+
+	err := cmh.Connect(App{})
+	if err != nil {
+		t.Fatalf("Failed to connect ConfigMapHandler: %v", err)
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			labels, skip := cmh.GetLabels(OAuthToken{PreferredUsername: tc.username, Groups: tc.groups})
+			assert.Equal(t, tc.expected, labels)
+			assert.Equal(t, tc.skip, skip)
+		})
+	}
+}

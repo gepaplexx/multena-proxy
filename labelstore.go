@@ -11,6 +11,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
+	"go.yaml.in/yaml/v3"
 )
 
 // Labelstore represents an interface defining methods for connecting to a
@@ -54,22 +55,37 @@ func (c *ConfigMapHandler) Connect(_ App) error {
 	v.SetConfigType("yaml")
 	v.AddConfigPath("/etc/config/labels/")
 	v.AddConfigPath("./configs")
+
 	err := v.MergeInConfig()
 	if err != nil {
 		return err
 	}
-	err = v.Unmarshal(&c.labels)
+
+	cfg := v.ConfigFileUsed()
+	cfgBytes, err := os.ReadFile(cfg)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Error reading config file")
+	}
+
+	err = yaml.Unmarshal(cfgBytes, &c.labels)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 		return err
 	}
+
 	v.OnConfigChange(func(e fsnotify.Event) {
 		log.Info().Str("file", e.Name).Msg("Config file changed")
 		err = v.MergeInConfig()
 		if err != nil {
 			log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 		}
-		err = v.Unmarshal(&c.labels)
+
+		cfgBytes, err = os.ReadFile(cfg)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Error reading config file")
+		}
+
+		err = yaml.Unmarshal(cfgBytes, &c.labels)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 		}
