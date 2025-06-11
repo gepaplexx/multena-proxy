@@ -6,3 +6,6 @@ user3:
   grafana: true # multi namespace
   opernshift-logging: true
   opernshift-monitoring: true
+user4:
+  Upper-case: true # mixed case labels
+  lower-case: true # mixed case labels
